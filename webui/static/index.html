@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TorrentGo — manager</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="rlogo" id="nav-logo"></div>
+      <div class="ri" data-nav="dashboard" title="Dashboard" id="ri-dash"></div>
+      <div class="ri" data-add title="Add magnet" id="ri-add"></div>
+      <div class="ri" data-nav="diag" title="Diagnostics" id="ri-diag"></div>
+      <div class="ri" data-settings title="Settings" id="ri-set"></div>
+      <div class="status" title="Engine online"></div>
+    </aside>
+    <main class="main" id="view"></main>
+  </div>
+
+  <div class="modal-backdrop" id="modal" hidden>
+    <div class="modal add-modal">
+      <h2>Add torrent</h2>
+      <label>Magnet link, .torrent URL, or infohash</label>
+      <textarea id="add-input" rows="2" placeholder="magnet:?xt=urn:btih:…"></textarea>
+
+      <div class="add-grid">
+        <div>
+          <label>Title</label>
+          <input id="add-title" class="ainp" placeholder="auto from torrent" />
+        </div>
+        <div>
+          <label>Type</label>
+          <select id="add-type" class="ainp"><option value="movie">Movie</option><option value="tv">Series</option></select>
+        </div>
+      </div>
+
+      <label>Poster</label>
+      <div class="add-poster-row">
+        <div class="add-poster-prev" id="add-poster-prev"></div>
+        <input id="add-poster" class="ainp" placeholder="poster image URL" />
+      </div>
+
+      <label>TMDB id</label>
+      <div class="add-tmdb-row">
+        <input id="add-tmdb" class="ainp" placeholder="e.g. 693134 — fills title + poster" />
+        <button class="btn" id="add-tmdb-btn" type="button">Fetch</button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" data-close>Cancel</button>
+        <button class="btn" id="add-download">Download to disk</button>
+        <button class="btn primary" id="add-submit">Add to library</button>
+      </div>
+      <div class="add-hint">“Add to library” saves metadata only — no download. “Download to disk” fetches the whole file.</div>
+      <div class="modal-error" id="add-error" hidden></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="settings-modal" hidden>
+    <div class="sset" id="sset"></div>
+  </div>
+
+  <div class="modal-backdrop" id="tinfo-modal" hidden>
+    <div class="modal tinfo"><div id="tinfo-body"></div></div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

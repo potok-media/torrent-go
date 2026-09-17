@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="src\Potok.Backend.Core\Potok.Backend.Core.csproj" />
-  <Project Path="src\Potok.Backend.Infrastructure\Potok.Backend.Infrastructure.csproj" />
-  <Project Path="src\Potok.Backend.Gateway\Potok.Backend.Gateway.csproj" />
-  <Project Path="src\Potok.Backend.CompositionTests\Potok.Backend.CompositionTests.csproj" />
-</Solution>
