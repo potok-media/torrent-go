@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"Potok.Backend.TorrentGo/storage"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 // The management UI exposes exactly ONE tunable: the global RAM budget for torrents. Everything else

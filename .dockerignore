@@ -1,4 +1,15 @@
 .git
+.github
+.idea
+.serena
+.vscode
+.env
+.env.*
 downloads
-Potok.Backend.TorrentGo
+torrent-cache
+data
+potok-torrentgo
+potok-torrent-go
+*.test
+coverage.out
 **/.DS_Store

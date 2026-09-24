@@ -1,0 +1,14 @@
+.DS_Store
+.idea/
+.vscode/
+.serena/
+.env
+.env.*
+!.env.example
+/downloads/
+/torrent-cache/
+/data/
+/potok-torrentgo
+/potok-torrent-go
+*.test
+coverage.out

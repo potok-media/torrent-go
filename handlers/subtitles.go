@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"Potok.Backend.TorrentGo/media"
-	"Potok.Backend.TorrentGo/storage"
 	"github.com/go-chi/chi/v5"
+	"github.com/potok-media/potok-torrentgo/media"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 // errSubtitleWindowNotReady is returned when a windowed subtitle request lands on a region that isn't

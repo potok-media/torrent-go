@@ -1,4 +1,4 @@
-module Potok.Backend.TorrentGo
+module github.com/potok-media/potok-torrentgo
 
 go 1.23
 

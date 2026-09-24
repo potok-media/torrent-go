@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"Potok.Backend.TorrentGo/media"
-	"Potok.Backend.TorrentGo/storage"
 	"github.com/go-chi/chi/v5"
+	"github.com/potok-media/potok-torrentgo/media"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 type ClientTrack struct {

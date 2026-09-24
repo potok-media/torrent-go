@@ -22,10 +22,13 @@ type videoEncoder struct {
 	dec         *astiav.CodecContext
 	enc         *astiav.CodecContext
 	hwDevCtx    *astiav.HardwareDeviceContext
+	hwFramesCtx *astiav.HardwareFramesContext
+	toneMapper  *videoToneMapper
 	sws         *astiav.SoftwareScaleContext
 	decFrm      *astiav.Frame
 	transferFrm *astiav.Frame
 	scaled      *astiav.Frame
+	uploadFrm   *astiav.Frame
 	pkt         *astiav.Packet
 	bsf         *astiav.BitStreamFilterContext // mpeg4_unpack_bframes for DivX/Xvid packed bitstream; nil otherwise
 	bsfPkt      *astiav.Packet                 // scratch for BSF output packets; nil when bsf is nil
@@ -35,6 +38,11 @@ type videoEncoder struct {
 	lastPTS    int64 // last decoded-frame pts fed to the encoder — monotonic guard (noPTS = none yet)
 	lastDTS    int64 // last output-packet dts written to the muxer — monotonic guard (noPTS = none yet)
 	inTimeBase astiav.Rational
+	hwDecode   bool
+	sourceHDR  bool
+	hdr10      bool
+	toneMapHW  bool
+	forceSWMap bool
 }
 
 // mpeg4UnpackBSF returns an initialized mpeg4_unpack_bframes bitstream filter for an MPEG-4 Part 2 (DivX/Xvid)
@@ -70,184 +78,46 @@ func mpeg4UnpackBSF(in *astiav.Stream) (*astiav.BitStreamFilterContext, *astiav.
 // H.264 output stream to ofc (before WriteHeader). Caller must free() it.
 func newVideoEncoder(ifc, ofc *astiav.FormatContext, srcIdx int, startTS, endTS int64, fw *fragWriter) (*videoEncoder, error) {
 	in := ifc.Streams()[srcIdx]
+	transfer := in.CodecParameters().ColorTransferCharacteristic()
 
 	decCodec := astiav.FindDecoder(in.CodecParameters().CodecID())
 	if decCodec == nil {
 		return nil, fmt.Errorf("media: no video decoder for %s", in.CodecParameters().CodecID().String())
 	}
-	dec := astiav.AllocCodecContext(decCodec)
-	if dec == nil {
-		return nil, fmt.Errorf("media: alloc video decoder")
-	}
-	if err := in.CodecParameters().ToCodecContext(dec); err != nil {
-		dec.Free()
-		return nil, fmt.Errorf("media: video decoder params: %w", err)
-	}
-
 	var hwDevCtx *astiav.HardwareDeviceContext
-	var hwPixFmt astiav.PixelFormat = astiav.PixelFormatNone
-
 	if ActiveGPU != nil {
-		supportsHW := false
-		for _, cfg := range decCodec.HardwareConfigs() {
-			if cfg.HardwareDeviceType() == ActiveGPU.HwType && cfg.MethodFlags().Has(astiav.CodecHardwareConfigMethodFlagHwDeviceCtx) {
-				supportsHW = true
-				hwPixFmt = cfg.PixelFormat()
-				break
-			}
-		}
-
-		if supportsHW {
-			device := ""
-			if ActiveGPU.HwTypeName == "vaapi" {
-				device = findRenderNode()
-			}
-			var err error
-			hwDevCtx, err = astiav.CreateHardwareDeviceContext(ActiveGPU.HwType, device, nil, 0)
-			if err != nil {
-				slog.Warn("Failed to create hardware device context for decoding, falling back to software decoder", "err", err)
-				hwDevCtx = nil
-			} else if hwPixFmt != astiav.PixelFormatNone {
-				dec.SetHardwareDeviceContext(hwDevCtx)
-				dec.SetPixelFormatCallback(func(pfs []astiav.PixelFormat) astiav.PixelFormat {
-					for _, pf := range pfs {
-						if pf == hwPixFmt {
-							return pf
-						}
-					}
-					return astiav.PixelFormatNone
-				})
-			} else {
-				hwDevCtx.Free()
-				hwDevCtx = nil
-			}
+		var err error
+		hwDevCtx, err = astiav.CreateHardwareDeviceContext(ActiveGPU.HwType, ActiveGPU.Device, nil, 0)
+		if err != nil {
+			slog.Warn("hardware video device disappeared; using CPU for this rendition", "provider", ActiveGPU.HwTypeName, "err", err)
+			hwDevCtx = nil
 		}
 	}
 
-	if err := dec.Open(decCodec, nil); err != nil {
+	dec, hwDecode, err := openVideoDecoder(in, decCodec, hwDevCtx)
+	if err != nil {
+		if hwDevCtx != nil {
+			hwDevCtx.Free()
+		}
+		return nil, err
+	}
+
+	enc, encCodec, hwFramesCtx, err := openVideoEncoder(in, dec, ofc, hwDevCtx)
+	if err != nil {
 		dec.Free()
 		if hwDevCtx != nil {
 			hwDevCtx.Free()
 		}
-		return nil, fmt.Errorf("media: open video decoder: %w", err)
-	}
-
-	var encCodec *astiav.Codec
-	if ActiveGPU != nil && hwDevCtx != nil {
-		encCodec = astiav.FindEncoderByName(ActiveGPU.EncoderName)
-	}
-	if encCodec == nil {
-		encCodec = astiav.FindEncoder(astiav.CodecIDH264)
-	}
-	if encCodec == nil {
-		dec.Free()
-		if hwDevCtx != nil {
-			hwDevCtx.Free()
-		}
-		return nil, fmt.Errorf("media: no H.264 encoder available")
-	}
-
-	enc := astiav.AllocCodecContext(encCodec)
-	if enc == nil {
-		dec.Free()
-		if hwDevCtx != nil {
-			hwDevCtx.Free()
-		}
-		return nil, fmt.Errorf("media: alloc H.264 encoder")
-	}
-	enc.SetWidth(dec.Width())
-	enc.SetHeight(dec.Height())
-
-	// Decide pixel format for encoder
-	var encPixFmt astiav.PixelFormat = astiav.PixelFormatYuv420P
-	hasNv12 := false
-	hasVaapi := false
-	for _, pf := range encCodec.PixelFormats() {
-		if pf == astiav.PixelFormatNv12 {
-			hasNv12 = true
-		}
-		if pf == astiav.PixelFormatVaapi {
-			hasVaapi = true
-		}
-	}
-	if hasVaapi && encCodec.Name() == "h264_vaapi" {
-		encPixFmt = astiav.PixelFormatVaapi
-	} else if hasNv12 && (encCodec.Name() == "h264_videotoolbox" || encCodec.Name() == "h264_nvenc") {
-		encPixFmt = astiav.PixelFormatNv12
-	}
-	enc.SetPixelFormat(encPixFmt)
-
-	enc.SetSampleAspectRatio(dec.SampleAspectRatio())
-
-	// Proper FPS and Timebase mapping to prevent level/MB-rate issues
-	fps := in.AvgFrameRate()
-	if fps.Num() > 0 && fps.Den() > 0 {
-		enc.SetFramerate(fps)
-		enc.SetTimeBase(fps.Invert())
-	} else {
-		enc.SetTimeBase(in.TimeBase())
-	}
-
-	if hwDevCtx != nil {
-		enc.SetHardwareDeviceContext(hwDevCtx)
-		if encPixFmt == astiav.PixelFormatVaapi {
-			hwFramesCtx := astiav.AllocHardwareFramesContext(hwDevCtx)
-			if hwFramesCtx == nil {
-				dec.Free()
-				enc.Free()
-				hwDevCtx.Free()
-				return nil, fmt.Errorf("media: alloc hardware frames context")
-			}
-			hwFramesCtx.SetHardwarePixelFormat(astiav.PixelFormatVaapi)
-			hwFramesCtx.SetSoftwarePixelFormat(astiav.PixelFormatNv12)
-			hwFramesCtx.SetWidth(dec.Width())
-			hwFramesCtx.SetHeight(dec.Height())
-			hwFramesCtx.SetInitialPoolSize(20)
-			if err := hwFramesCtx.Initialize(); err != nil {
-				hwFramesCtx.Free()
-				dec.Free()
-				enc.Free()
-				hwDevCtx.Free()
-				return nil, fmt.Errorf("media: initialize hardware frames context: %w", err)
-			}
-			enc.SetHardwareFramesContext(hwFramesCtx)
-			hwFramesCtx.Free()
-		}
-	}
-
-	if ofc.OutputFormat().Flags().Has(astiav.IOFormatFlagGlobalheader) {
-		enc.SetFlags(enc.Flags().Add(astiav.CodecContextFlagGlobalHeader))
-	}
-
-	opts := astiav.NewDictionary()
-	defer opts.Free()
-	if encCodec.Name() == "h264_nvenc" {
-		opts.Set("preset", "p4", 0)
-		opts.Set("rc", "vbr", 0)
-		opts.Set("cq", "24", 0)
-	} else if encCodec.Name() == "h264_vaapi" {
-		opts.Set("rc_mode", "CQP", 0)
-		opts.Set("qp", "24", 0)
-	} else if encCodec.Name() == "h264_videotoolbox" {
-		opts.Set("realtime", "1", 0)
-	} else {
-		opts.Set("preset", "veryfast", 0)
-		opts.Set("crf", "23", 0)
-	}
-
-	if err := enc.Open(encCodec, opts); err != nil {
-		dec.Free()
-		enc.Free()
-		if hwDevCtx != nil {
-			hwDevCtx.Free()
-		}
-		return nil, fmt.Errorf("media: open H.264 encoder: %w", err)
+		return nil, err
 	}
 
 	out := ofc.NewStream(nil)
 	if out == nil {
 		dec.Free()
 		enc.Free()
+		if hwFramesCtx != nil {
+			hwFramesCtx.Free()
+		}
 		if hwDevCtx != nil {
 			hwDevCtx.Free()
 		}
@@ -256,6 +126,9 @@ func newVideoEncoder(ifc, ofc *astiav.FormatContext, srcIdx int, startTS, endTS 
 	if err := out.CodecParameters().FromCodecContext(enc); err != nil {
 		dec.Free()
 		enc.Free()
+		if hwFramesCtx != nil {
+			hwFramesCtx.Free()
+		}
 		if hwDevCtx != nil {
 			hwDevCtx.Free()
 		}
@@ -265,9 +138,14 @@ func newVideoEncoder(ifc, ofc *astiav.FormatContext, srcIdx int, startTS, endTS 
 
 	bsf, bsfPkt := mpeg4UnpackBSF(in)
 	var transferFrm *astiav.Frame
-	if hwDevCtx != nil && encPixFmt != astiav.PixelFormatVaapi {
+	if hwDecode {
 		transferFrm = astiav.AllocFrame()
 	}
+	var uploadFrm *astiav.Frame
+	if hwFramesCtx != nil {
+		uploadFrm = astiav.AllocFrame()
+	}
+	slog.Info("video transcoder opened", "decoder", decCodec.Name(), "hardwareDecode", hwDecode, "encoder", encCodec.Name())
 
 	return &videoEncoder{
 		ofc:         ofc,
@@ -276,10 +154,12 @@ func newVideoEncoder(ifc, ofc *astiav.FormatContext, srcIdx int, startTS, endTS 
 		dec:         dec,
 		enc:         enc,
 		hwDevCtx:    hwDevCtx,
+		hwFramesCtx: hwFramesCtx,
 		inTimeBase:  in.TimeBase(),
 		decFrm:      astiav.AllocFrame(),
 		transferFrm: transferFrm,
 		scaled:      astiav.AllocFrame(),
+		uploadFrm:   uploadFrm,
 		pkt:         astiav.AllocPacket(),
 		bsf:         bsf,
 		bsfPkt:      bsfPkt,
@@ -287,7 +167,182 @@ func newVideoEncoder(ifc, ofc *astiav.FormatContext, srcIdx int, startTS, endTS 
 		endTS:       endTS,
 		lastPTS:     noPTS,
 		lastDTS:     noPTS,
+		hwDecode:    hwDecode,
+		sourceHDR:   isHDRTransfer(transfer),
+		hdr10:       transfer == astiav.ColorTransferCharacteristicSmpte2084,
 	}, nil
+}
+
+func openVideoDecoder(in *astiav.Stream, codec *astiav.Codec, hwDevCtx *astiav.HardwareDeviceContext) (*astiav.CodecContext, bool, error) {
+	newContext := func() (*astiav.CodecContext, error) {
+		ctx := astiav.AllocCodecContext(codec)
+		if ctx == nil {
+			return nil, fmt.Errorf("media: alloc video decoder")
+		}
+		if err := in.CodecParameters().ToCodecContext(ctx); err != nil {
+			ctx.Free()
+			return nil, fmt.Errorf("media: video decoder params: %w", err)
+		}
+		return ctx, nil
+	}
+
+	if ActiveGPU != nil && hwDevCtx != nil {
+		for _, cfg := range codec.HardwareConfigs() {
+			if cfg.HardwareDeviceType() != ActiveGPU.HwType || !cfg.MethodFlags().Has(astiav.CodecHardwareConfigMethodFlagHwDeviceCtx) {
+				continue
+			}
+			hwPixFmt := cfg.PixelFormat()
+			ctx, err := newContext()
+			if err != nil {
+				return nil, false, err
+			}
+			ctx.SetHardwareDeviceContext(hwDevCtx)
+			ctx.SetPixelFormatCallback(func(pfs []astiav.PixelFormat) astiav.PixelFormat {
+				for _, pf := range pfs {
+					if pf == hwPixFmt {
+						return pf
+					}
+				}
+				return astiav.PixelFormatNone
+			})
+			if err := ctx.Open(codec, nil); err == nil {
+				return ctx, true, nil
+			} else {
+				slog.Warn("hardware decoder rejected source; retaining hardware encoder with software decode", "provider", ActiveGPU.HwTypeName, "codec", codec.Name(), "err", err)
+				ctx.Free()
+			}
+			break
+		}
+	}
+
+	ctx, err := newContext()
+	if err != nil {
+		return nil, false, err
+	}
+	ctx.SetThreadCount(cpuEncoderThreadLimit())
+	if err := ctx.Open(codec, nil); err != nil {
+		ctx.Free()
+		return nil, false, fmt.Errorf("media: open software video decoder: %w", err)
+	}
+	return ctx, false, nil
+}
+
+func openVideoEncoder(in *astiav.Stream, dec *astiav.CodecContext, ofc *astiav.FormatContext, hwDevCtx *astiav.HardwareDeviceContext) (*astiav.CodecContext, *astiav.Codec, *astiav.HardwareFramesContext, error) {
+	if ActiveGPU != nil && hwDevCtx != nil {
+		codec := astiav.FindEncoderByName(ActiveGPU.EncoderName)
+		if codec != nil {
+			enc, frames, err := openVideoEncoderCandidate(in, dec, ofc, codec, hwDevCtx)
+			if err == nil {
+				return enc, codec, frames, nil
+			}
+			slog.Warn("hardware encoder could not open; using bounded CPU fallback", "provider", ActiveGPU.HwTypeName, "encoder", ActiveGPU.EncoderName, "err", err)
+		}
+	}
+
+	codec := astiav.FindEncoderByName("libx264")
+	if codec == nil {
+		codec = astiav.FindEncoder(astiav.CodecIDH264)
+	}
+	if codec == nil {
+		return nil, nil, nil, fmt.Errorf("media: no H.264 encoder available")
+	}
+	enc, _, err := openVideoEncoderCandidate(in, dec, ofc, codec, nil)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("media: open CPU H.264 encoder: %w", err)
+	}
+	return enc, codec, nil, nil
+}
+
+func openVideoEncoderCandidate(in *astiav.Stream, dec *astiav.CodecContext, ofc *astiav.FormatContext, codec *astiav.Codec, hwDevCtx *astiav.HardwareDeviceContext) (*astiav.CodecContext, *astiav.HardwareFramesContext, error) {
+	enc := astiav.AllocCodecContext(codec)
+	if enc == nil {
+		return nil, nil, fmt.Errorf("media: alloc H.264 encoder %s", codec.Name())
+	}
+	fail := func(frames *astiav.HardwareFramesContext, err error) (*astiav.CodecContext, *astiav.HardwareFramesContext, error) {
+		if frames != nil {
+			frames.Free()
+		}
+		enc.Free()
+		return nil, nil, err
+	}
+
+	enc.SetWidth(dec.Width())
+	enc.SetHeight(dec.Height())
+	enc.SetSampleAspectRatio(dec.SampleAspectRatio())
+	enc.SetProfile(astiav.ProfileH264High)
+	enc.SetMaxBFrames(0)
+	if isHDRTransfer(in.CodecParameters().ColorTransferCharacteristic()) {
+		enc.SetColorPrimaries(astiav.ColorPrimariesBt709)
+		enc.SetColorTransferCharacteristic(astiav.ColorTransferCharacteristicBt709)
+		enc.SetColorSpace(astiav.ColorSpaceBt709)
+		enc.SetColorRange(astiav.ColorRangeMpeg)
+	} else {
+		enc.SetColorPrimaries(in.CodecParameters().ColorPrimaries())
+		enc.SetColorTransferCharacteristic(in.CodecParameters().ColorTransferCharacteristic())
+		enc.SetColorSpace(in.CodecParameters().ColorSpace())
+		enc.SetColorRange(in.CodecParameters().ColorRange())
+	}
+
+	fps := in.AvgFrameRate()
+	if fps.Num() > 0 && fps.Den() > 0 {
+		enc.SetFramerate(fps)
+		enc.SetTimeBase(fps.Invert())
+	} else {
+		enc.SetTimeBase(in.TimeBase())
+	}
+	if ofc.OutputFormat().Flags().Has(astiav.IOFormatFlagGlobalheader) {
+		enc.SetFlags(enc.Flags().Add(astiav.CodecContextFlagGlobalHeader))
+	}
+
+	var frames *astiav.HardwareFramesContext
+	switch codec.Name() {
+	case "h264_vaapi":
+		enc.SetPixelFormat(astiav.PixelFormatVaapi)
+		enc.SetHardwareDeviceContext(hwDevCtx)
+		frames = astiav.AllocHardwareFramesContext(hwDevCtx)
+		if frames == nil {
+			return fail(nil, fmt.Errorf("media: alloc VAAPI frames context"))
+		}
+		frames.SetHardwarePixelFormat(astiav.PixelFormatVaapi)
+		frames.SetSoftwarePixelFormat(astiav.PixelFormatNv12)
+		frames.SetWidth(dec.Width())
+		frames.SetHeight(dec.Height())
+		frames.SetInitialPoolSize(20)
+		if err := frames.Initialize(); err != nil {
+			return fail(frames, fmt.Errorf("media: initialize VAAPI frames context: %w", err))
+		}
+		enc.SetHardwareFramesContext(frames)
+	case "h264_nvenc", "h264_videotoolbox":
+		enc.SetPixelFormat(astiav.PixelFormatNv12)
+		enc.SetHardwareDeviceContext(hwDevCtx)
+	default:
+		enc.SetPixelFormat(astiav.PixelFormatYuv420P)
+		enc.SetThreadCount(cpuEncoderThreadLimit())
+	}
+
+	opts := astiav.NewDictionary()
+	defer opts.Free()
+	switch codec.Name() {
+	case "h264_nvenc":
+		_ = opts.Set("preset", "p4", 0)
+		_ = opts.Set("tune", "ll", 0)
+		_ = opts.Set("rc", "vbr", 0)
+		_ = opts.Set("cq", "24", 0)
+	case "h264_vaapi":
+		_ = opts.Set("rc_mode", "CQP", 0)
+		_ = opts.Set("qp", "24", 0)
+	case "h264_videotoolbox":
+		_ = opts.Set("realtime", "1", 0)
+		_ = opts.Set("allow_sw", "0", 0)
+	default:
+		_ = opts.Set("preset", "veryfast", 0)
+		_ = opts.Set("crf", "23", 0)
+		_ = opts.Set("tune", "zerolatency", 0)
+	}
+	if err := enc.Open(codec, opts); err != nil {
+		return fail(frames, fmt.Errorf("media: open H.264 encoder %s: %w", codec.Name(), err))
+	}
+	return enc, frames, nil
 }
 
 func (v *videoEncoder) free() {
@@ -298,7 +353,13 @@ func (v *videoEncoder) free() {
 	if v.bsf != nil {
 		v.bsf.Free()
 	}
+	if v.toneMapper != nil {
+		v.toneMapper.free()
+	}
 	v.scaled.Free()
+	if v.uploadFrm != nil {
+		v.uploadFrm.Free()
+	}
 	if v.transferFrm != nil {
 		v.transferFrm.Free()
 	}
@@ -308,6 +369,9 @@ func (v *videoEncoder) free() {
 	}
 	v.enc.Free()
 	v.dec.Free()
+	if v.hwFramesCtx != nil {
+		v.hwFramesCtx.Free()
+	}
 	if v.hwDevCtx != nil {
 		v.hwDevCtx.Free()
 	}
@@ -380,19 +444,60 @@ func (v *videoEncoder) drainDecoder() error {
 	}
 }
 
-// encodeDecoded converts the current decoded frame to 8-bit yuv420p if needed, then encodes it.
+// encodeDecoded normalizes decoded video to an 8-bit browser-safe format. VAAPI requires an explicit
+// software NV12 -> hardware-frame upload; passing a software frame to an encoder configured for the VAAPI
+// pixel format is invalid and was the reason the old path silently stayed on libx264.
 func (v *videoEncoder) encodeDecoded() error {
+	if v.canHardwareToneMap() && !v.forceSWMap {
+		if v.toneMapper == nil {
+			mapper, err := newVideoToneMapper(v.decFrm, v.inTimeBase, vaapiToneMapFilter(), v.hwDevCtx, true)
+			if err == nil {
+				v.toneMapper = mapper
+				v.toneMapHW = true
+			} else {
+				slog.Warn("VAAPI HDR tone mapping unavailable; using bounded software tone mapping with hardware encode", "err", err)
+				v.forceSWMap = true
+			}
+		}
+		if v.toneMapper != nil {
+			if err := v.toneMapper.process(v.decFrm, v.encodeReadyFrame); err == nil {
+				return nil
+			} else {
+				slog.Warn("VAAPI HDR tone mapping failed; using bounded software tone mapping with hardware encode", "err", err)
+				v.toneMapper.free()
+				v.toneMapper = nil
+				v.toneMapHW = false
+				v.forceSWMap = true
+			}
+		}
+	}
+
 	frame := v.decFrm
-	if v.hwDevCtx != nil && v.transferFrm != nil {
+	if v.hwDecode {
 		v.transferFrm.Unref()
 		if err := v.decFrm.TransferHardwareData(v.transferFrm); err != nil {
-			return fmt.Errorf("media: transfer hardware data: %w", err)
+			return fmt.Errorf("media: download decoded hardware frame: %w", err)
 		}
 		v.transferFrm.SetPts(v.decFrm.Pts())
 		frame = v.transferFrm
 	}
 
 	targetFmt := v.enc.PixelFormat()
+	if v.hwFramesCtx != nil {
+		targetFmt = astiav.PixelFormatNv12
+	}
+	if v.sourceHDR {
+		if v.toneMapper == nil {
+			mapper, err := newVideoToneMapper(frame, v.inTimeBase, softwareToneMapFilter(targetFmt), nil, false)
+			if err != nil {
+				return fmt.Errorf("media: initialize portable HDR tone mapping: %w", err)
+			}
+			v.toneMapper = mapper
+			v.toneMapHW = false
+		}
+		return v.toneMapper.process(frame, v.prepareSoftwareFrame)
+	}
+
 	if frame.PixelFormat() != targetFmt {
 		if v.sws == nil {
 			var err error
@@ -415,7 +520,30 @@ func (v *videoEncoder) encodeDecoded() error {
 		v.scaled.SetPts(frame.Pts())
 		frame = v.scaled
 	}
+	return v.prepareSoftwareFrame(frame)
+}
 
+func (v *videoEncoder) canHardwareToneMap() bool {
+	return v.sourceHDR && v.hdr10 && v.hwDecode && v.hwFramesCtx != nil &&
+		ActiveGPU != nil && ActiveGPU.HwTypeName == "vaapi"
+}
+
+func (v *videoEncoder) prepareSoftwareFrame(frame *astiav.Frame) error {
+	if v.hwFramesCtx != nil {
+		v.uploadFrm.Unref()
+		if err := v.uploadFrm.AllocHardwareBuffer(v.hwFramesCtx); err != nil {
+			return fmt.Errorf("media: allocate VAAPI frame: %w", err)
+		}
+		if err := frame.TransferHardwareData(v.uploadFrm); err != nil {
+			return fmt.Errorf("media: upload frame to VAAPI: %w", err)
+		}
+		v.uploadFrm.SetPts(frame.Pts())
+		frame = v.uploadFrm
+	}
+	return v.encodeReadyFrame(frame)
+}
+
+func (v *videoEncoder) encodeReadyFrame(frame *astiav.Frame) error {
 	// Rescale PTS to encoder timebase to prevent timebase mismatch (R6)
 	pts := astiav.RescaleQ(frame.Pts(), v.inTimeBase, v.enc.TimeBase())
 	frame.SetPts(pts)
@@ -477,6 +605,15 @@ func (v *videoEncoder) flush() error {
 	}
 	if err := v.drainDecoder(); err != nil {
 		return err
+	}
+	if v.toneMapper != nil {
+		consume := v.prepareSoftwareFrame
+		if v.toneMapHW {
+			consume = v.encodeReadyFrame
+		}
+		if err := v.toneMapper.flush(consume); err != nil {
+			return err
+		}
 	}
 	return v.encode(nil)
 }

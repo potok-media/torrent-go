@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"Potok.Backend.TorrentGo/config"
-	"Potok.Backend.TorrentGo/storage"
 	"github.com/anacrolix/torrent"
+	"github.com/potok-media/potok-torrentgo/config"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 type Engine struct {
@@ -17,12 +17,12 @@ type Engine struct {
 
 func NewEngine(cfg *config.Config, store *storage.Storage) (*Engine, error) {
 	clientCfg := torrent.NewDefaultClientConfig()
-	
+
 	clientCfg.DefaultStorage = store
 	clientCfg.ListenPort = cfg.ListenPort
 	clientCfg.EstablishedConnsPerTorrent = cfg.ConnsPerTorrent
 	clientCfg.HalfOpenConnsPerTorrent = cfg.HalfOpenConns
-	
+
 	slog.Info("Initializing Torrent Client with custom storage...",
 		slog.Int("listenPort", cfg.ListenPort),
 	)

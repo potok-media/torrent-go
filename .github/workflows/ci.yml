@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # The builder includes the pinned FFmpeg headers and shared libraries required by cgo.
+      - name: Build test image
+        run: docker build --target builder --tag potok-torrentgo:test .
+
+      - name: Test
+        run: docker run --rm potok-torrentgo:test go test ./...
+
+      - name: Vet
+        run: docker run --rm potok-torrentgo:test go vet ./...

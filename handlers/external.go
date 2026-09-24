@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"Potok.Backend.TorrentGo/storage"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/asticode/go-astisub"
 	"github.com/go-chi/chi/v5"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 // External (sidecar) track support for "ext" releases: dub audio / subtitle files stored as SEPARATE files in

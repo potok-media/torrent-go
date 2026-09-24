@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"Potok.Backend.TorrentGo/media"
-	"Potok.Backend.TorrentGo/storage"
+	"github.com/potok-media/potok-torrentgo/media"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 // In-process HLS production (TorrentGo v2, multivariant "HLS4"). Each rendition is produced INDEPENDENTLY

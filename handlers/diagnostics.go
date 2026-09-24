@@ -6,7 +6,7 @@ import (
 	"syscall"
 	"time"
 
-	"Potok.Backend.TorrentGo/storage"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 // HandleDiagnostics answers the diagnostics page: a full accounting of where RAM (and disk) goes — the Go

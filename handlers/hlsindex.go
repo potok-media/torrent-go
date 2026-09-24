@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"Potok.Backend.TorrentGo/storage"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 // hlsSegmentSeconds is the target segment length. For the COPY path this is a MINIMUM — computeSegList

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"Potok.Backend.TorrentGo/bt"
-	"Potok.Backend.TorrentGo/catalog"
 	"github.com/go-chi/chi/v5"
+	"github.com/potok-media/potok-torrentgo/bt"
+	"github.com/potok-media/potok-torrentgo/catalog"
 )
 
 var btihRe = regexp.MustCompile(`(?i)xt=urn:btih:([a-z2-7]{32}|[a-f0-9]{40})`)

@@ -15,12 +15,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"Potok.Backend.TorrentGo/bt"
-	"Potok.Backend.TorrentGo/catalog"
-	"Potok.Backend.TorrentGo/config"
-	"Potok.Backend.TorrentGo/speed"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/go-chi/chi/v5"
+	"github.com/potok-media/potok-torrentgo/bt"
+	"github.com/potok-media/potok-torrentgo/catalog"
+	"github.com/potok-media/potok-torrentgo/config"
+	"github.com/potok-media/potok-torrentgo/speed"
 	"golang.org/x/sync/singleflight"
 )
 

@@ -48,6 +48,13 @@ func setFragOpts(dict *astiav.Dictionary, flags string) error {
 // InitSegment produces the fMP4 initialization segment (ftyp+moov) shared by every media segment of this
 // (source, stream-set) — i.e. the client's EXT-X-MAP. It is just the muxer header with no packets.
 func InitSegment(ctx context.Context, src io.ReadSeeker, streams []int, transcodeVideo bool) ([]byte, error) {
+	if transcodeVideo {
+		release, err := processVideoTranscodes.acquire(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
+	}
 	ifc, icleanup, err := openDemux(ctx, src)
 	if err != nil {
 		return nil, err
@@ -102,6 +109,13 @@ func InitSegment(ctx context.Context, src io.ReadSeeker, streams []int, transcod
 func Segment(ctx context.Context, src io.ReadSeeker, startSec, durSec float64, streams []int, transcodeVideo bool) ([]byte, error) {
 	if len(streams) == 0 {
 		return nil, errors.New("media: no streams selected")
+	}
+	if transcodeVideo {
+		release, err := processVideoTranscodes.acquire(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
 	}
 
 	ifc, icleanup, err := openDemux(ctx, src)

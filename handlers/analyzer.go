@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"Potok.Backend.TorrentGo/media"
-	"Potok.Backend.TorrentGo/storage"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/potok-media/potok-torrentgo/media"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 type TimecodeRange struct {

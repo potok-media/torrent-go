@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"Potok.Backend.TorrentGo/config"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
+	"github.com/potok-media/potok-torrentgo/config"
 )
 
 type Storage struct {

@@ -1,0 +1,35 @@
+services:
+  potok-torrentgo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/potok-media/potok-torrentgo:latest
+    container_name: potok-torrentgo
+    restart: unless-stopped
+    ports:
+      - "${TORRENTGO_PORT:-5282}:${TORRENTGO_PORT:-5282}"
+      # Optional inbound BitTorrent connections, when the host allows port forwarding:
+      # - "55123:55123/tcp"
+      # - "55123:55123/udp"
+    environment:
+      PORT: ${TORRENTGO_PORT:-5282}
+      TMDB_API_KEY: ${TMDB_API_KEY:-2c4fa42c601c29b6fea7ad9b211c46f0}
+      TORRENTGO_ENABLE_WEBUI: ${TORRENTGO_ENABLE_WEBUI:-false}
+      POTOK_AUTH_USER: ${POTOK_AUTH_USER:-}
+      POTOK_AUTH_PASS: ${POTOK_AUTH_PASS:-}
+      POTOK_DISABLE_HWACCEL: ${POTOK_DISABLE_HWACCEL:-0}
+      POTOK_VAAPI_DEVICE: ${POTOK_VAAPI_DEVICE:-}
+      POTOK_VIDEO_TRANSCODE_CONCURRENCY: ${POTOK_VIDEO_TRANSCODE_CONCURRENCY:-1}
+      POTOK_DOWNLOAD_DIR: /app/downloads
+      POTOK_DATA_DIR: /app/data
+    volumes:
+      - torrentgo-cache:/app/torrent-cache
+      - torrentgo-downloads:/app/downloads
+      - torrentgo-data:/app/data
+    devices:
+      - ${GPU_DEVICE:-/dev/null:/dev/null}
+
+volumes:
+  torrentgo-cache:
+  torrentgo-downloads:
+  torrentgo-data:

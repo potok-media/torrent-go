@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"Potok.Backend.TorrentGo/storage"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/go-chi/chi/v5"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 // readClassFromRequest derives the storage read intent (priority + wait policy) and optional caller

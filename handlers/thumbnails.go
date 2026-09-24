@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"Potok.Backend.TorrentGo/media"
-	"Potok.Backend.TorrentGo/storage"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/go-chi/chi/v5"
+	"github.com/potok-media/potok-torrentgo/media"
+	"github.com/potok-media/potok-torrentgo/storage"
 	"golang.org/x/sync/singleflight"
 )
 

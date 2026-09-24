@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// TestSegmentRoundtrip validates the in-process copy path end-to-end against a real local file.
+// TestSegmentRoundtrip validates the in-process copy/transcode path end-to-end against a real local file.
 //
 //	POTOK_TEST_MEDIA=/path/to/h264.mkv go test ./media -run Segment -v
 //
@@ -22,7 +22,7 @@ import (
 func TestSegmentRoundtrip(t *testing.T) {
 	in := os.Getenv("POTOK_TEST_MEDIA")
 	if in == "" {
-		t.Skip("set POTOK_TEST_MEDIA=/path/to/media to run the copy-path roundtrip")
+		t.Skip("set POTOK_TEST_MEDIA=/path/to/media to run the media roundtrip")
 	}
 
 	outDir := os.Getenv("POTOK_TEST_OUT")
@@ -52,9 +52,11 @@ func TestSegmentRoundtrip(t *testing.T) {
 	}
 
 	video, audio := -1, -1
+	videoCodec := ""
 	for _, tr := range probe.Tracks {
 		if tr.Kind == "video" && video < 0 {
 			video = tr.Index
+			videoCodec = tr.Codec
 		}
 		if tr.Kind == "audio" && audio < 0 {
 			audio = tr.Index
@@ -67,13 +69,14 @@ func TestSegmentRoundtrip(t *testing.T) {
 	if audio >= 0 {
 		streams = append(streams, audio)
 	}
+	transcodeVideo := videoCodec != "h264"
 
 	// Each media/ call gets a fresh reader — a demux context owns its own seek cursor (this is why the
 	// pool, step 2b, needs a reader factory rather than a single shared reader).
 	if _, err := f.Seek(0, 0); err != nil {
 		t.Fatalf("seek 0: %v", err)
 	}
-	initSeg, err := InitSegment(ctx, f, streams, false)
+	initSeg, err := InitSegment(ctx, f, streams, transcodeVideo)
 	if err != nil {
 		t.Fatalf("InitSegment: %v", err)
 	}
@@ -86,7 +89,7 @@ func TestSegmentRoundtrip(t *testing.T) {
 	if _, err := f.Seek(0, 0); err != nil {
 		t.Fatalf("seek 0: %v", err)
 	}
-	seg, err := Segment(ctx, f, 0, 6, streams, false)
+	seg, err := Segment(ctx, f, 0, 6, streams, transcodeVideo)
 	if err != nil {
 		t.Fatalf("Segment: %v", err)
 	}

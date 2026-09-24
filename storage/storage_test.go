@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"Potok.Backend.TorrentGo/config"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/potok-media/potok-torrentgo/config"
 )
 
 func TestMemPieceReadWriteComplete(t *testing.T) {

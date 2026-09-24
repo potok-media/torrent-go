@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"Potok.Backend.TorrentGo/media"
-	"Potok.Backend.TorrentGo/storage"
+	"github.com/potok-media/potok-torrentgo/media"
+	"github.com/potok-media/potok-torrentgo/storage"
 )
 
 // Continuous-AAC handler glue (see plan vivid-moseying-sloth). For a non-AAC audio track we transcode the whole

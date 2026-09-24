@@ -4,7 +4,7 @@ import (
 	"crypto/subtle"
 	"net/http"
 
-	"Potok.Backend.TorrentGo/config"
+	"github.com/potok-media/potok-torrentgo/config"
 )
 
 func BasicAuth(cfg *config.Config) func(http.Handler) http.Handler {
@@ -19,7 +19,7 @@ func BasicAuth(cfg *config.Config) func(http.Handler) http.Handler {
 			if !ok ||
 				subtle.ConstantTimeCompare([]byte(user), []byte(cfg.AuthUser)) != 1 ||
 				subtle.ConstantTimeCompare([]byte(pass), []byte(cfg.AuthPass)) != 1 {
-				
+
 				w.Header().Set("WWW-Authenticate", `Basic realm="Potok TorrentGo v2"`)
 				w.WriteHeader(http.StatusUnauthorized)
 				_, _ = w.Write([]byte("Unauthorized\n"))

@@ -13,16 +13,16 @@ import (
 	"syscall"
 	"time"
 
-	"Potok.Backend.TorrentGo/auth"
-	"Potok.Backend.TorrentGo/bt"
-	"Potok.Backend.TorrentGo/config"
-	"Potok.Backend.TorrentGo/handlers"
-	"Potok.Backend.TorrentGo/media"
-	"Potok.Backend.TorrentGo/speed"
-	"Potok.Backend.TorrentGo/storage"
-	"Potok.Backend.TorrentGo/webui"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/potok-media/potok-torrentgo/auth"
+	"github.com/potok-media/potok-torrentgo/bt"
+	"github.com/potok-media/potok-torrentgo/config"
+	"github.com/potok-media/potok-torrentgo/handlers"
+	"github.com/potok-media/potok-torrentgo/media"
+	"github.com/potok-media/potok-torrentgo/speed"
+	"github.com/potok-media/potok-torrentgo/storage"
+	"github.com/potok-media/potok-torrentgo/webui"
 )
 
 func raiseRlimit() {
