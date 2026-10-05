@@ -86,7 +86,7 @@ func main() {
 	default:
 		level = slog.LevelInfo
 	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})))
+	slog.SetDefault(slog.New(newColorTextHandler(os.Stdout, level)))
 
 	slog.Info("Starting Potok Go Torrent Engine v2...")
 	// In-process media core (go-astiav → libav*) link check. Forces the binary to dynamically load the
@@ -94,6 +94,9 @@ func main() {
 	// rather than on the first segment request.
 	if media.LibavLinked() {
 		slog.Info("libav linked — in-process media core available")
+		// Clamp + bridge libav's av_log into slog BEFORE any demux/probe runs (InitGPU included) —
+		// otherwise it writes probe noise straight to stderr at its default info level.
+		media.InitLogging()
 		media.InitGPU()
 	} else {
 		slog.Warn("libav NOT linked — in-process media core unavailable")
@@ -142,15 +145,7 @@ func main() {
 
 	r.Use(CORSMiddleware)
 	r.Use(middleware.Recoverer)
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if req.URL.Path == "/health" || req.URL.Path == "/health/" {
-				next.ServeHTTP(w, req)
-				return
-			}
-			middleware.Logger(next).ServeHTTP(w, req)
-		})
-	})
+	r.Use(handlers.AccessLog)
 
 	// Ensure CORS is set on 404 and 405 responses
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {

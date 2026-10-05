@@ -448,7 +448,7 @@ func (h *HandlerContext) HandleDeleteTorrent(w http.ResponseWriter, r *http.Requ
 	}
 	copy(infoHash[:], hexBytes)
 
-	h.dropTorrent(infoHash, hashHex)
+	h.dropTorrent(infoHash, hashHex, "deleted via API")
 	if h.Catalog != nil {
 		h.Catalog.Remove(hashHex) // explicit delete forgets the metadata + pin/mode (drop just frees runtime)
 	}
@@ -459,8 +459,8 @@ func (h *HandlerContext) HandleDeleteTorrent(w http.ResponseWriter, r *http.Requ
 
 // dropTorrent force-tears-down a torrent and frees ALL of its memory: purges its playback sessions,
 // closes+removes its piece cache, drops it from the client, and purges every per-file cache. Used by both
-// the idle reaper and the DELETE endpoint.
-func (h *HandlerContext) dropTorrent(infoHash metainfo.Hash, hashHex string) {
+// the idle reaper and the DELETE endpoint; `reason` identifies the caller in the drop log line.
+func (h *HandlerContext) dropTorrent(infoHash metainfo.Hash, hashHex, reason string) {
 	prefix := hashHex + "_"
 
 	// One serialized owner step: claim the drop (idempotent vs reaper+DELETE), purge this hash's playback
@@ -502,13 +502,27 @@ func (h *HandlerContext) dropTorrent(infoHash metainfo.Hash, hashHex string) {
 			_ = cache.Close()
 			h.Engine.Storage.DeleteCache(infoHash)
 		}
+		// Snapshot stats BEFORE Drop so the log line keeps what this torrent did over its lifetime.
+		var peers, downloaded, uploaded, completed int64
 		if t, ok := h.Engine.Client.Torrent(infoHash); ok {
+			st := t.Stats()
+			peers = int64(st.ActivePeers)
+			downloaded = st.BytesReadUsefulData.Int64()
+			uploaded = st.BytesWrittenData.Int64()
+			completed = t.BytesCompleted()
 			t.Drop()
 		}
 		h.lifecycleMu.Lock()
 		delete(h.dropping, hashHex)
 		h.lifecycleMu.Unlock()
-		slog.Info("torrent dropped", "hash", hashHex)
+		slog.Info("torrent dropped",
+			"hash", hashHex,
+			"reason", reason,
+			"peers", peers,
+			"downloaded_bytes", downloaded,
+			"uploaded_bytes", uploaded,
+			"completed_bytes", completed,
+		)
 	}()
 }
 

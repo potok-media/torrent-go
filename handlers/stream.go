@@ -93,10 +93,10 @@ func (h *HandlerContext) HandleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if t.Info() == nil {
-		slog.Info("Stream waiting for torrent info...", "hash", hashHex)
+		slog.Debug("Stream waiting for torrent info...", "hash", hashHex)
 		select {
 		case <-t.GotInfo():
-			slog.Info("Stream: Torrent info resolved", "hash", hashHex)
+			slog.Debug("Stream: Torrent info resolved", "hash", hashHex)
 		case <-r.Context().Done():
 			return
 		case <-time.After(30 * time.Second):
@@ -181,7 +181,13 @@ func (h *HandlerContext) HandleStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
 
-	slog.Info("Streaming file directly", "path", file.Path(), "mime", contentType, "size", file.Length())
+	// One info line per playback start (the initial, un-ranged request); subsequent range/seek requests
+	// are routine player traffic and stay at debug so scrubbing doesn't flood the log.
+	if shouldPreload {
+		slog.Info("stream started", "hash", hashHex, "file", fileIndexStr, "path", file.Path(), "size", file.Length(), "mime", contentType)
+	} else {
+		slog.Debug("stream range request", "hash", hashHex, "file", fileIndexStr, "range", rangeHeader)
+	}
 	http.ServeContent(w, r, filepath.Base(file.Path()), time.Time{}, reader)
 }
 
@@ -351,7 +357,7 @@ func (h *HandlerContext) preloadHeadersToCache(hashHex, fileIndexStr string, fil
 			}
 			fh.mu.Unlock()
 		}
-		slog.Info("Proactively cached start headers in RAM", "size", n, "key", cacheKey, "err", err)
+		slog.Debug("Proactively cached start headers in RAM", "size", n, "key", cacheKey, "err", err)
 	}
 
 	// 2. Read last 8MB without lock
@@ -371,7 +377,7 @@ func (h *HandlerContext) preloadHeadersToCache(hashHex, fileIndexStr string, fil
 				}
 				fh.mu.Unlock()
 			}
-			slog.Info("Proactively cached end headers in RAM", "size", n, "key", cacheKey, "err", err)
+			slog.Debug("Proactively cached end headers in RAM", "size", n, "key", cacheKey, "err", err)
 		} else {
 			reader.Close()
 		}

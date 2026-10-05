@@ -148,7 +148,7 @@ func (h *HandlerContext) produceAudioSegmentCont(ctx context.Context, cont *medi
 			if complete || producedTo >= hi {
 				data, serr := media.SegmentFromAAC(cont, lo, hi)
 				if serr == nil {
-					slog.Debug("[HLS4-DIAG] audiocont", "n", n, "lo", lo, "hi", hi, "producedTo", producedTo, "complete", complete, "bytes", len(data))
+					slog.Debug("audiocont segment", "n", n, "lo", lo, "hi", hi, "producedTo", producedTo, "complete", complete, "bytes", len(data))
 				}
 				return data, serr
 			}

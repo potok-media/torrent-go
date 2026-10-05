@@ -66,10 +66,13 @@ func (h *HandlerContext) HandlePlaybackKeepalive(w http.ResponseWriter, r *http.
 	if _, exists := h.playback[req.SessionID]; !exists {
 		if max := h.maxStreams(); max > 0 && len(h.playback) >= max {
 			h.lifecycleMu.Unlock()
+			slog.Warn("playback session rejected: too many concurrent streams",
+				"sessionId", req.SessionID, "hash", req.Hash, "file", req.File, "active", len(h.playback), "max", max)
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			http.Error(w, "too many concurrent streams", http.StatusTooManyRequests)
 			return
 		}
+		slog.Info("playback session started", "sessionId", req.SessionID, "hash", req.Hash, "file", req.File)
 	}
 	h.playback[req.SessionID] = &playSession{hash: req.Hash, file: req.File, lastPing: time.Now()}
 	h.lifecycleMu.Unlock()
@@ -96,8 +99,12 @@ func (h *HandlerContext) HandlePlaybackStop(w http.ResponseWriter, r *http.Reque
 	}
 
 	h.lifecycleMu.Lock()
+	s, existed := h.playback[sessionID]
 	delete(h.playback, sessionID)
 	h.lifecycleMu.Unlock()
+	if existed {
+		slog.Info("playback session stopped", "sessionId", sessionID, "hash", s.hash, "file", s.file)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -112,15 +119,17 @@ func (h *HandlerContext) ReapPlaybackSessions() {
 
 		h.lifecycleMu.Lock()
 		expired := 0
+		var expiredHashes []string
 		for id, s := range h.playback {
 			if s.lastPing.Before(cutoff) {
 				delete(h.playback, id)
 				expired++
+				expiredHashes = append(expiredHashes, s.hash)
 			}
 		}
 		h.lifecycleMu.Unlock()
 		if expired > 0 {
-			slog.Info("playback sessions expired", "count", expired)
+			slog.Info("playback sessions expired", "count", expired, "hashes", expiredHashes)
 		}
 
 		// Drop torrents nobody watches, after the linger grace. torrentSeen advances only while a torrent
@@ -148,7 +157,7 @@ func (h *HandlerContext) ReapPlaybackSessions() {
 			}
 			h.lifecycleMu.Unlock()
 			if drop {
-				h.dropTorrent(t.InfoHash(), hash)
+				h.dropTorrent(t.InfoHash(), hash, "idle: no playback sessions past grace")
 			}
 		}
 	}

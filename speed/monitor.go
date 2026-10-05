@@ -2,6 +2,7 @@ package speed
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -35,6 +36,7 @@ func (m *Monitor) Start(ctx context.Context) {
 		write int64
 	}
 	lastStats := make(map[string]statsSnapshot)
+	tick := 0
 
 	for {
 		select {
@@ -80,6 +82,25 @@ func (m *Monitor) Start(ctx context.Context) {
 			m.mu.Lock()
 			m.speeds = newSpeeds
 			m.mu.Unlock()
+
+			// Aggregate activity snapshot at debug, throttled to ~1 line/15s and only while bytes are
+			// actually moving — idle ticks would be pure noise.
+			tick++
+			if tick >= 15 {
+				tick = 0
+				var dl, ul int64
+				active := 0
+				for _, s := range newSpeeds {
+					dl += s.DownloadSpeed
+					ul += s.UploadSpeed
+					if s.DownloadSpeed > 0 || s.UploadSpeed > 0 {
+						active++
+					}
+				}
+				if active > 0 {
+					slog.Debug("speed", "down_bps", dl, "up_bps", ul, "active_torrents", active, "total_torrents", len(newSpeeds))
+				}
+			}
 		}
 	}
 }

@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"sync"
+	"time"
 )
 
 // extClass is the kind of ffmpeg extraction competing for the box's CPU/decode + torrent bandwidth.
@@ -16,6 +19,19 @@ const (
 	extHeavy                   // full-file demux (batch/single subtitle) — expensive, patient
 	extAnalyze                 // analyzer fingerprint decode
 )
+
+func (c extClass) String() string {
+	switch c {
+	case extWindow:
+		return "window"
+	case extHeavy:
+		return "heavy"
+	case extAnalyze:
+		return "analyze"
+	default:
+		return "unknown"
+	}
+}
 
 // extExecutor admits extraction jobs up to a per-class limit, blocking (ctx-cancellable) when full.
 type extExecutor struct {
@@ -52,9 +68,18 @@ func (e *extExecutor) Acquire(ctx context.Context, cls extClass) (func(), error)
 	})
 	defer stop()
 
+	waitStart := time.Now()
 	for e.inflight[cls] >= limit {
 		if err := ctx.Err(); err != nil {
+			waited := time.Since(waitStart)
 			e.mu.Unlock()
+			// A deadline means the queue genuinely starved the job (worth a warn); a plain cancel is
+			// just the client leaving mid-wait (routine, debug).
+			if errors.Is(err, context.DeadlineExceeded) {
+				slog.Warn("extraction admission timed out", "class", cls.String(), "waited_ms", waited.Milliseconds(), "limit", limit)
+			} else {
+				slog.Debug("extraction admission canceled", "class", cls.String(), "waited_ms", waited.Milliseconds())
+			}
 			return nil, err
 		}
 		e.cond.Wait()

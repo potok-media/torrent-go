@@ -99,16 +99,21 @@ func (h *HandlerContext) buildSegList(ctx context.Context, hashHex, fileIndexStr
 	// grid that media/ transcodes segment-by-segment.
 	layout, lerr := h.getStreamLayout(ctx, hashHex, fileIndexStr)
 	if lerr != nil {
-		return uniformSegList(dur, 0), nil // probe failed → safest is a uniform (transcode) grid from 0
+		// probe failed → safest is a uniform (transcode) grid from 0
+		slog.Warn("hls: stream layout probe failed, falling back to transcode grid", "hash", hashHex, "file", fileIndexStr, "error", lerr)
+		return uniformSegList(dur, 0), nil
 	}
 
 	if layout.videoCodec == "h264" {
 		if sl := h.tryIndexSegList(ctx, hashHex, fileIndexStr, dur); sl != nil {
+			slog.Info("hls: copy grid (keyframe-aligned)", "hash", hashHex, "file", fileIndexStr, "codec", layout.videoCodec, "segments", sl.count())
 			return sl, nil
 		}
 	}
 	// Uniform boundaries from the video's start-PTS; media/ transcodes each segment with an IDR-led start.
-	return uniformSegList(dur, layout.videoStartSec), nil
+	sl := uniformSegList(dur, layout.videoStartSec)
+	slog.Info("hls: transcode grid", "hash", hashHex, "file", fileIndexStr, "codec", layout.videoCodec, "segments", sl.count())
+	return sl, nil
 }
 
 const (

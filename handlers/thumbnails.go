@@ -202,7 +202,7 @@ func (h *HandlerContext) HandleGetThumbnail(w http.ResponseWriter, r *http.Reque
 
 		data, terr := media.Thumbnail(extractCtx, rs, float64(roundedTime), 160, 90)
 		if terr != nil {
-			slog.Error("thumbnail extraction failed", "hash", hashHex, "file", fileIndexStr, "error", terr)
+			slog.Error("thumbnail extraction failed", "hash", hashHex, "file", fileIndexStr, "time", roundedTime, "error", terr)
 			return nil, terr
 		}
 		h.ThumbService.cache.Set(cacheKey, data)

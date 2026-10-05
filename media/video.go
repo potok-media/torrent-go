@@ -145,7 +145,14 @@ func newVideoEncoder(ifc, ofc *astiav.FormatContext, srcIdx int, startTS, endTS 
 	if hwFramesCtx != nil {
 		uploadFrm = astiav.AllocFrame()
 	}
-	slog.Info("video transcoder opened", "decoder", decCodec.Name(), "hardwareDecode", hwDecode, "encoder", encCodec.Name())
+	// Transcoders open per segment, so the codec/device selection is info-logged only once per unique
+	// pipeline (decoder/hardware/encoder) — that first line is what confirms the encode device choice.
+	attrs := []any{"decoder", decCodec.Name(), "hardwareDecode", hwDecode, "encoder", encCodec.Name()}
+	if ActiveGPU != nil {
+		attrs = append(attrs, "provider", ActiveGPU.HwTypeName)
+	}
+	logTranscoderChoiceOnce("video transcoder opened",
+		fmt.Sprintf("video|%s|%t|%s", decCodec.Name(), hwDecode, encCodec.Name()), attrs...)
 
 	return &videoEncoder{
 		ofc:         ofc,

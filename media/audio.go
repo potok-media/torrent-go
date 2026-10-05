@@ -91,6 +91,8 @@ func newAudioEncoder(ifc, ofc *astiav.FormatContext, srcIdx int, startTS, endTS 
 		enc.Free()
 		return nil, fmt.Errorf("media: open AAC encoder: %w", err)
 	}
+	logTranscoderChoiceOnce("audio transcoder opened",
+		"audio|"+decCodec.Name()+"|"+encCodec.Name(), "decoder", decCodec.Name(), "encoder", encCodec.Name())
 
 	out := ofc.NewStream(nil)
 	if out == nil {

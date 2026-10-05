@@ -24,9 +24,9 @@ import (
 func (h *HandlerContext) HandleHls(w http.ResponseWriter, r *http.Request) {
 	// The `/hls/*` wildcard captures the rendition sub-path: master.m3u8 | v/… | a/{rel}/… | s/{rel}/…
 	rest := chi.URLParam(r, "*")
-	// [HLS4-DIAG] playlist requests (segments are logged in serveProduced). Remove after diagnosis.
+	// Playlist requests (segments are logged in serveProduced) — debug: routine player traffic.
 	if strings.HasSuffix(rest, ".m3u8") {
-		slog.Info("[HLS4-DIAG] playlist", "path", rest)
+		slog.Debug("hls playlist", "path", rest)
 	}
 	parts := strings.Split(rest, "/")
 	switch {
@@ -272,13 +272,13 @@ func renderMediaPlaylist(sl *segList, mapURI, segExt string) []byte {
 	return []byte(b.String())
 }
 
-// serveProduced serves a cached-or-produced binary/text artifact (segment, init, or vtt). The [HLS4-DIAG]
+// serveProduced serves a cached-or-produced binary/text artifact (segment, init, or vtt). The debug
 // line reports, per request, which rendition+segment it is (the cacheKey encodes _v_/_a{rel}_/_s{rel}_ +
-// index), whether it was a cache hit, and how long a miss took to produce — so out-of-order/pending network
-// requests become readable (a slow `_v_386` produce vs an instant `_a0_400` hit). Remove after diagnosis.
+// index), whether it was a cache hit, and how long a miss took to produce — so out-of-order/pending
+// network requests become readable (a slow `_v_386` produce vs an instant `_a0_400` hit).
 func (h *HandlerContext) serveProduced(w http.ResponseWriter, r *http.Request, cacheKey, contentType string, produce func() ([]byte, error)) {
 	if data, ok := h.hlsSegCache.get(cacheKey); ok {
-		slog.Info("[HLS4-DIAG] serve", "key", cacheKey, "cache", "hit", "bytes", len(data))
+		slog.Debug("hls serve", "key", cacheKey, "cache", "hit", "bytes", len(data))
 		writeSeg(w, contentType, data)
 		return
 	}
@@ -286,15 +286,15 @@ func (h *HandlerContext) serveProduced(w http.ResponseWriter, r *http.Request, c
 	data, err := produce()
 	if err != nil {
 		if r.Context().Err() != nil {
-			slog.Info("[HLS4-DIAG] produce canceled (client gone)", "key", cacheKey, "ms", time.Since(t0).Milliseconds())
+			slog.Debug("hls produce canceled (client gone)", "key", cacheKey, "ms", time.Since(t0).Milliseconds())
 			return
 		}
-		slog.Error("[HLS4-DIAG] produce FAILED", "key", cacheKey, "ms", time.Since(t0).Milliseconds(), "error", err)
+		slog.Error("hls produce FAILED", "key", cacheKey, "ms", time.Since(t0).Milliseconds(), "error", err)
 		http.Error(w, "segment failed", http.StatusInternalServerError)
 		return
 	}
 	h.hlsSegCache.put(cacheKey, data)
-	slog.Info("[HLS4-DIAG] serve", "key", cacheKey, "cache", "miss", "bytes", len(data), "produceMs", time.Since(t0).Milliseconds())
+	slog.Debug("hls serve", "key", cacheKey, "cache", "miss", "bytes", len(data), "produceMs", time.Since(t0).Milliseconds())
 	writeSeg(w, contentType, data)
 }
 

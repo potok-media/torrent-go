@@ -55,6 +55,30 @@ On macOS with Homebrew FFmpeg 7, set
 `PKG_CONFIG_PATH="$(brew --prefix ffmpeg@7)/lib/pkgconfig"` before these commands.
 Some media integration tests require a local sample: use `POTOK_TEST_MEDIA` for the
 segment round-trip test and `POTOK_SEEK_DIAG` for the seek/tiling diagnostics.
+Note: `TestToneMapFiltersAreIncludedInFFmpegBuild` requires the VAAPI-enabled FFmpeg
+build and only passes in the Docker builder image (Linux), not on macOS Homebrew.
+
+## Logging
+
+All logs are `log/slog` text on stdout; `POTOK_LOG_LEVEL` (`debug` / `info` / `warn` /
+`error`, default `info`) sets the app level. The level and message are ANSI-colored by
+severity (debug gray, info green, warn yellow, error standard red). Logging policy is
+fixed in code:
+
+- The in-process FFmpeg (libav) is clamped to errors and bridged into slog — its probe
+  noise (unknown attachment codecs, analyzeduration hints, swscaler deprecations) never
+  reaches the log.
+- The HTTP access log mutes high-frequency polls on success (`/health`, playback
+  keepalive/stop, thumbnails, HLS playlists+segments, torrent status polls); any status
+  ≥ 400 is always logged (≥ 500 as error).
+
+At `info` you see lifecycle events: torrent add/resolve/drop (with reason and
+final stats), playback session start/stop/expiry and 429 rejections, stream
+starts, HLS grid decisions (copy vs transcode), and all warnings/errors.
+The transcode pipeline's codec/device selection (`video transcoder opened` /
+`audio transcoder opened` with decoder, encoder, hardwareDecode, provider) is
+logged once per unique pipeline — repeated per-segment opens stay at `debug`,
+along with per-request segment/thumbnail/keepalive traffic and speed snapshots.
 
 ## CI and releases
 

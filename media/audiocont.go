@@ -201,6 +201,8 @@ func (c *ContinuousAAC) transcode(ctx context.Context, src io.ReadSeeker, srcIdx
 	if err := enc.Open(encCodec, nil); err != nil {
 		return fmt.Errorf("media: audiocont: open AAC encoder: %w", err)
 	}
+	logTranscoderChoiceOnce("audio transcoder opened (continuous)",
+		"audiocont|"+decCodec.Name()+"|"+encCodec.Name(), "decoder", decCodec.Name(), "encoder", encCodec.Name())
 
 	// Freeze the AAC config for the init segment (available near-instantly, before any frame is encoded).
 	cp := astiav.AllocCodecParameters()
