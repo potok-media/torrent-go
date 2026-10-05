@@ -1410,21 +1410,6 @@ paths:
       summary: Extract a JPEG thumbnail at a timestamp
       tags:
       - Media
-  /docs:
-    get:
-      description: Serves the Scalar API-reference page rendering /openapi.yaml.
-      operationId: getApiDocs
-      produces:
-      - text/html
-      responses:
-        "200":
-          description: Scalar HTML page
-          schema:
-            type: string
-      security: []
-      summary: Interactive API documentation (Scalar UI)
-      tags:
-      - System
   /health:
     get:
       description: Liveness probe; always 200 with the plain-text body "OK".
@@ -1454,6 +1439,21 @@ paths:
             type: string
       security: []
       summary: OpenAPI specification
+      tags:
+      - System
+  /scalar:
+    get:
+      description: Serves the Scalar API-reference page rendering /openapi.yaml.
+      operationId: getApiDocs
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: Scalar HTML page
+          schema:
+            type: string
+      security: []
+      summary: Interactive API documentation (Scalar UI)
       tags:
       - System
   /stream/{hash}/{fileIndex}:

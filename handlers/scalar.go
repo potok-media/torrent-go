@@ -2,9 +2,9 @@ package handlers
 
 import "net/http"
 
-// docsPage is a self-contained Scalar API-reference page pointed at the embedded OpenAPI spec
+// scalarPage is a self-contained Scalar API-reference page pointed at the embedded OpenAPI spec
 // (/openapi.yaml). The Scalar runtime comes from the jsDelivr CDN; the page itself carries no assets.
-const docsPage = `<!doctype html>
+const scalarPage = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -22,7 +22,7 @@ const docsPage = `<!doctype html>
 </html>
 `
 
-// HandleDocs godoc
+// HandleScalar godoc
 //	@ID			getApiDocs
 //
 //	@Summary		Interactive API documentation (Scalar UI)
@@ -31,9 +31,9 @@ const docsPage = `<!doctype html>
 //	@Produce		html
 //	@Success		200	{string}	string	"Scalar HTML page"
 //	@Security
-//	@Router			/docs [get]
-func HandleDocs(w http.ResponseWriter, _ *http.Request) {
+//	@Router			/scalar [get]
+func HandleScalar(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
-	_, _ = w.Write([]byte(docsPage))
+	_, _ = w.Write([]byte(scalarPage))
 }

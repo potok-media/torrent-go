@@ -208,7 +208,7 @@ func main() {
 	// Health check + API documentation (unauthenticated, always on)
 	r.Get("/health", handleHealth)
 	r.Get("/openapi.yaml", handleOpenAPI)
-	r.Get("/docs", handlers.HandleDocs)
+	r.Get("/scalar", handlers.HandleScalar)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
