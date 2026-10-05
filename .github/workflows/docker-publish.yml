@@ -59,8 +59,23 @@ jobs:
           # Fetch all tags from remote repository to have correct tag history
           git fetch --tags --force
 
-          # Get latest tag matching "v*" or fallback to "v0.0.0"
-          LATEST_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "v0.0.0")
+          # Highest version among ALL v-tags. NOT git describe: it returns the NEAREST reachable tag,
+          # so a beta tagged on a newer commit shadows a higher release (e.g. v2.0.0 + v1.1.0-beta.1 on
+          # the next commit → describe says v1.1.0-beta.1 and the next "release" regresses to 1.1.0).
+          TAGS=$(git tag -l 'v[0-9]*')
+          if [ -z "$TAGS" ]; then
+            LATEST_TAG="v0.0.0"
+          else
+            # Highest X.Y.Z base across all tags...
+            MAX_BASE=$(printf '%s\n' "$TAGS" | sed 's/^v//; s/-beta\.[0-9]*$//' | sort -V | tail -1)
+            if printf '%s\n' "$TAGS" | grep -Fxq "v$MAX_BASE"; then
+              LATEST_TAG="v$MAX_BASE" # a final release exists at the highest base
+            else
+              # ...otherwise the highest beta at that base
+              MAX_BETA=$(printf '%s\n' "$TAGS" | sed -n "s/^v\(.*\)-beta\.\([0-9][0-9]*\)$/\1 \2/p" | awk -v b="$MAX_BASE" '$1==b {print $2}' | sort -n | tail -1)
+              LATEST_TAG="v$MAX_BASE-beta.$MAX_BETA"
+            fi
+          fi
           echo "Latest Git Tag: $LATEST_TAG"
 
           CURRENT_VERSION="${LATEST_TAG#v}"

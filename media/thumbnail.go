@@ -12,9 +12,9 @@ import (
 // Thumbnail decodes a single video frame at ~timeSec and returns it as a width×height JPEG — in-process
 // (custom AVIO over the torrent cache), replacing the ffmpeg `-ss … -vframes 1 -s … image2` subprocess.
 // It seeks to the keyframe at/just before timeSec (good enough for a scrubbing thumbnail), decodes one
-// frame, scales it to yuv420p at the requested size, and MJPEG-encodes it. (yuv420p, NOT yuvj420p: the
-// deprecated full-range J formats make swscaler warn on every scale and MJPEG accepts the limited-range
-// equivalent.)
+// frame, scales it to yuvj420p at the requested size, and MJPEG-encodes it. NOTE: the MJPEG encoder
+// REJECTS limited-range yuv420p ("Non full-range YUV is non-standard...") — yuvj420p is required. Its
+// swscaler deprecation warning is invisible anyway: av_log is clamped to error (media/logging.go).
 func Thumbnail(ctx context.Context, src io.ReadSeeker, timeSec float64, width, height int) ([]byte, error) {
 	fc, cleanup, err := openDemux(ctx, src)
 	if err != nil {
@@ -102,11 +102,11 @@ func Thumbnail(ctx context.Context, src io.ReadSeeker, timeSec float64, width, h
 		return nil, fmt.Errorf("media: thumbnail: no frame decoded")
 	}
 
-	// Scale to the target size + yuv420p (what the MJPEG encoder accepts; yuvj420p would trip the
-	// swscaler deprecated-pixel-format warning on every thumbnail).
+	// Scale to the target size + yuvj420p (what the MJPEG encoder wants — it refuses limited-range
+	// yuv420p under default strict_std_compliance).
 	sws, err := astiav.CreateSoftwareScaleContext(
 		frame.Width(), frame.Height(), frame.PixelFormat(),
-		width, height, astiav.PixelFormatYuv420P,
+		width, height, astiav.PixelFormatYuvj420P,
 		astiav.SoftwareScaleContextFlags(astiav.SoftwareScaleContextFlagBilinear),
 	)
 	if err != nil {
@@ -117,7 +117,7 @@ func Thumbnail(ctx context.Context, src io.ReadSeeker, timeSec float64, width, h
 	defer scaled.Free()
 	scaled.SetWidth(width)
 	scaled.SetHeight(height)
-	scaled.SetPixelFormat(astiav.PixelFormatYuv420P)
+	scaled.SetPixelFormat(astiav.PixelFormatYuvj420P)
 	if err := sws.ScaleFrame(frame, scaled); err != nil {
 		return nil, fmt.Errorf("media: thumbnail: scale: %w", err)
 	}
@@ -133,7 +133,7 @@ func Thumbnail(ctx context.Context, src io.ReadSeeker, timeSec float64, width, h
 	defer enc.Free()
 	enc.SetWidth(width)
 	enc.SetHeight(height)
-	enc.SetPixelFormat(astiav.PixelFormatYuv420P)
+	enc.SetPixelFormat(astiav.PixelFormatYuvj420P)
 	enc.SetTimeBase(astiav.NewRational(1, 25))
 	if err := enc.Open(encCodec, nil); err != nil {
 		return nil, fmt.Errorf("media: thumbnail: open MJPEG encoder: %w", err)
