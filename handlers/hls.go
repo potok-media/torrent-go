@@ -21,6 +21,29 @@ import (
 // (libav via go-astiav over the RAM torrent cache); only the video (once, shared) and the actually-loaded
 // audio track are ever transcoded. fMP4 for A/V (.m4s + shared init.mp4 via EXT-X-MAP); WebVTT (.vtt) for subs.
 
+// HandleHls godoc
+//	@ID			getHls
+//
+//	@Summary		HLS multivariant delivery (master playlist, renditions, segments)
+//	@Description	One wildcard operation covering the whole HLS4 tree. The `{hlsPath}` wildcard selects the artifact:
+//	@Description
+//	@Description	- `master.m3u8` — multivariant playlist: one video variant plus EXT-X-MEDIA AUDIO/SUBTITLES renditions. `?xa=<idx,idx>` appends EXTERNAL audio renditions demuxed from separate torrent files (1-based indices).
+//	@Description	- `v/index.m3u8`, `v/init.mp4`, `v/seg{N}.m4s` — audio-agnostic video rendition (fMP4, shared init via EXT-X-MAP).
+//	@Description	- `a/{rel}/index.m3u8`, `a/{rel}/init.mp4`, `a/{rel}/seg{N}.m4s` — embedded audio track `rel` (0-based relIndex from /metadata). Non-AAC tracks are transcoded to AAC on the fly.
+//	@Description	- `s/{rel}/index.m3u8`, `s/{rel}/seg{N}.vtt` — embedded subtitle track `rel` as WebVTT (no init).
+//	@Description	- `xa/{extIdx}/{rel}/index.m3u8|init.mp4|seg{N}.m4s` — external audio rendition demuxed from torrent file `extIdx` (1-based), reusing the video file's segment grid.
+//	@Description
+//	@Description	Every rendition shares one VOD segment grid so timelines align. Segments/init are produced on demand, in-process (libav over the RAM torrent cache), and served from a rolling LRU with `Cache-Control: immutable`. Content types: playlists `application/vnd.apple.mpegurl`, init/segments `video/mp4`, subtitles `text/vtt`.
+//	@Tags			HLS
+//	@Param			hash		path		string	true	"Infohash (40-char hex)"
+//	@Param			fileIndex	path		int		true	"Video file index in the torrent (1-based)"
+//	@Param			hlsPath		path		string	true	"HLS artifact path, e.g. master.m3u8, v/seg12.m4s, a/0/index.m3u8, s/1/seg3.vtt, xa/7/0/init.mp4"
+//	@Param			xa			query		string	false	"master.m3u8 only: external audio files (1-based torrent indices, comma-separated)"
+//	@Success		200			{string}		binary	"Playlist (application/vnd.apple.mpegurl), fMP4 init/segment (video/mp4) or WebVTT segment (text/vtt)"
+//	@Failure		404			{string}	string	"unknown HLS path or segment index"
+//	@Failure		500			{string}	string	"hls unavailable / segment produce failed"
+//	@Security
+//	@Router			/api/torrents/{hash}/files/{fileIndex}/hls/{hlsPath} [get]
 func (h *HandlerContext) HandleHls(w http.ResponseWriter, r *http.Request) {
 	// The `/hls/*` wildcard captures the rendition sub-path: master.m3u8 | v/… | a/{rel}/… | s/{rel}/…
 	rest := chi.URLParam(r, "*")

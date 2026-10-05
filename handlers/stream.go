@@ -66,6 +66,31 @@ func (h *HandlerContext) fileByteInfo(hashHex, fileIndexStr string) (cache *stor
 	return c, f.Offset(), f.Length(), true
 }
 
+// HandleStream godoc
+//
+//	@Summary		Progressive download of a torrent file
+//	@Description	Serves the raw container bytes straight from the RAM piece cache with HTTP Range support (200 full body / 206 partial / 416 unsatisfiable). Waits up to 30s for unresolved torrent metadata (504 on timeout). `raw=true` skips the preload bookkeeping; `class` selects the read priority (playback | ahead | cold | patient; legacy `bg=1` maps to ahead); `deadline` (unix milliseconds) caps the reader's wait. An optional cosmetic `/{filename}` suffix is accepted on both route shapes (e.g. /api/torrents/{hash}/files/{fileIndex}/stream/movie.mkv). HEAD is supported on both shapes. Adaptive playback is handled by the HLS endpoint instead.
+//	@Tags			Streaming
+//	@Produce		octet-stream
+//	@Param			hash		path		string	true	"Infohash (40-char hex)"
+//	@Param			fileIndex	path		int		true	"File index in the torrent (1-based)"
+//	@Param			raw			query		bool	false	"raw=true — serve progressive bytes without preload bookkeeping"
+//	@Param			class		query		string	false	"Read class: playback | ahead | cold | patient"	Enums(playback, ahead, cold, patient)
+//	@Param			bg			query		string	false	"Legacy: bg=1 → ahead read class"
+//	@Param			deadline	query		int		false	"Caller deadline as unix milliseconds — caps the reader's wait"
+//	@Param			Range		header		string	false	"HTTP Range header (e.g. bytes=0-)"
+//	@Success		200			{string}		binary	"Full body"
+//	@Success		206			{string}		binary	"Partial content (Content-Range)"
+//	@Failure		400			{string}	string	"invalid hash or file index"
+//	@Failure		404			{string}	string	"torrent not active"
+//	@Failure		416			{string}	string	"range not satisfiable"
+//	@Failure		500			{string}	string	"storage cache not found"
+//	@Failure		504			{string}	string	"timeout waiting for torrent metadata (30s)"
+//	@Security
+//	@Router			/api/torrents/{hash}/files/{fileIndex}/stream [get]
+//	@Router			/api/torrents/{hash}/files/{fileIndex}/stream [head]
+//	@Router			/stream/{hash}/{fileIndex} [get]
+//	@Router			/stream/{hash}/{fileIndex} [head]
 func (h *HandlerContext) HandleStream(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 	fileIndexStr := chi.URLParam(r, "fileIndex")

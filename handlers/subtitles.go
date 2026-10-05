@@ -91,6 +91,25 @@ func isTextSubtitleCodec(codec string) bool {
 	}
 }
 
+// HandleGetSubtitles godoc
+//
+//	@Summary		Extract an embedded subtitle track
+//	@Description	Demuxes an embedded text subtitle track (0-based trackIndex = subtitle relIndex from /metadata) and serves it as WebVTT (default), ASS/SSA or SRT depending on `format`. With `start` the extraction is windowed around the playhead; a window whose pieces are not downloaded yet returns 202 + `Retry-After: 2` and the client retries as playback nears. Responses carry a content ETag — conditional re-requests get 304. Also mounted at the legacy path /stream/{hash}/{fileIndex}/subtitles/{trackIndex}.
+//	@Tags			Media
+//	@Produce		plain
+//	@Param			hash		path		string	true	"Infohash (40-char hex)"
+//	@Param			fileIndex	path		int		true	"File index in the torrent (1-based)"
+//	@Param			trackIndex	path		int		true	"Subtitle track index (0-based, per-file subtitle relIndex)"
+//	@Param			format		query		string	false	"Output format: webvtt (default) | ass | srt"
+//	@Param			start		query		number	false	"Playhead seconds — extract only the windowed time-slice around it"
+//	@Success		200			{string}	string	"Subtitle body (text/vtt, text/x-ssa or text/srt)"
+//	@Success		202			{string}	string	"Window not downloaded yet — retry after Retry-After seconds"
+//	@Header			202			{integer}	Retry-After	"Seconds to wait before retrying"
+//	@Success		304			{string}	string	"Not modified (matching ETag)"
+//	@Failure		500			{string}	string	"subtitle extraction failed"
+//	@Security
+//	@Router			/api/torrents/{hash}/files/{fileIndex}/subtitles/{trackIndex} [get]
+//	@Router			/stream/{hash}/{fileIndex}/subtitles/{trackIndex} [get]
 func (h *HandlerContext) HandleGetSubtitles(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 	fileIndexStr := chi.URLParam(r, "fileIndex")

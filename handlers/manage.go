@@ -15,12 +15,14 @@ import (
 // aggregate stats, and pin control. Mounted under /api/manage/* behind BasicAuth (main.go); the plugin's
 // own endpoints stay open. Named /api/manage/* so "stats"/"torrents" can't be parsed as a {hash}.
 
-type manageTorrent struct {
+// ManageTorrent is one row of the management dashboard: a live torrent (or a saved library entry with
+// State "Saved") joined with its remembered catalog metadata, speeds, peers and watcher count.
+type ManageTorrent struct {
 	Hash           string  `json:"hash"`
 	Name           string  `json:"name"`
 	Poster         string  `json:"poster,omitempty"`
 	MediaType      string  `json:"mediaType,omitempty"`
-	State          string  `json:"state"`
+	State          string  `json:"state" enums:"Metadata,Downloading,Seeding,Saved"`
 	Progress       float64 `json:"progress"`
 	SizeBytes      int64   `json:"sizeBytes"`
 	CompletedBytes int64   `json:"completedBytes"`
@@ -30,18 +32,47 @@ type manageTorrent struct {
 	Seeders        int     `json:"seeders"`
 	Watchers       int     `json:"watchers"`
 	Pinned         bool    `json:"pinned"`
-	DownloadMode   string  `json:"downloadMode"`
+	DownloadMode   string  `json:"downloadMode" enums:"stream,disk"`
 	CurrentFile    string  `json:"currentFile,omitempty"`
 }
 
-// HandleListTorrents returns every live torrent joined with its remembered metadata, speeds, peers and
-// watcher count — the dashboard's main feed.
+// PinResponse acknowledges a pin/unpin toggle.
+type PinResponse struct {
+	Hash   string `json:"hash"`
+	Pinned bool   `json:"pinned"`
+}
+
+// ManageTorrentFilesResponse is the torrent detail view: flat file list plus catalog metadata for the
+// page header.
+type ManageTorrentFilesResponse struct {
+	Hash           string              `json:"hash"`
+	Name           string              `json:"name"`
+	Ready          bool                `json:"ready"`
+	Poster         string              `json:"poster,omitempty"`
+	MediaType      string              `json:"mediaType,omitempty"`
+	Pinned         bool                `json:"pinned,omitempty"`
+	DownloadMode   string              `json:"downloadMode,omitempty"`
+	Files          []ManageTorrentFile `json:"files"`
+}
+
+// HandleListTorrents godoc
+//	@ID			listTorrents
+//
+//	@Summary		List all torrents
+//	@Description	Every live torrent joined with its remembered metadata, speeds, peers and watcher count, plus saved library entries (State "Saved") — the dashboard's main feed.
+//	@Tags			Management
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Failure		401		{string}	string	"unauthorized (BasicAuth)"
+//	@Success		200	{array}	handlers.ManageTorrent
+//	@x-scalar-ignore	true
+//	@Router			/api/manage/torrents [get]
 func (h *HandlerContext) HandleListTorrents(w http.ResponseWriter, r *http.Request) {
 	watchers, files := h.watchersByHash()
 
 	torrents := h.Engine.Client.Torrents()
 	live := make(map[string]bool, len(torrents))
-	out := make([]manageTorrent, 0, len(torrents))
+	out := make([]ManageTorrent, 0, len(torrents))
 	for _, t := range torrents {
 		hash := t.InfoHash().HexString()
 		live[hash] = true
@@ -61,7 +92,7 @@ func (h *HandlerContext) HandleListTorrents(w http.ResponseWriter, r *http.Reque
 			state = "Seeding"
 		}
 
-		item := manageTorrent{
+		item := ManageTorrent{
 			Hash:           hash,
 			Name:           t.Name(),
 			State:          state,
@@ -99,7 +130,7 @@ func (h *HandlerContext) HandleListTorrents(w http.ResponseWriter, r *http.Reque
 			if live[e.Hash] {
 				continue
 			}
-			out = append(out, manageTorrent{
+			out = append(out, ManageTorrent{
 				Hash: e.Hash, Name: e.Title, Poster: e.Poster, MediaType: e.MediaType,
 				State: "Saved", DownloadMode: e.DownloadMode, Pinned: e.Pinned,
 			})
@@ -109,7 +140,7 @@ func (h *HandlerContext) HandleListTorrents(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, out)
 }
 
-type manageStats struct {
+type ManageStats struct {
 	TotalDownload int64 `json:"totalDownload"`
 	TotalUpload   int64 `json:"totalUpload"`
 	Active        int   `json:"active"`
@@ -124,8 +155,18 @@ type manageStats struct {
 	MaxStreams    int   `json:"maxStreams"`
 }
 
-// HandleManageStats returns the aggregate KPIs: summed speeds, torrent/session counts, the GLOBAL cache
-// fill (from the Phase-0 accountant), Go heap/sys memory, and the concurrent-stream cap.
+// HandleManageStats godoc
+//	@ID			getManageStats
+//
+//	@Summary		Aggregate engine KPIs
+//	@Description	Summed speeds, torrent/session counts, the GLOBAL piece-cache fill, Go heap/sys memory, and the concurrent-stream cap.
+//	@Tags			Management
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Failure		401		{string}	string	"unauthorized (BasicAuth)"
+//	@Success		200	{object}	handlers.ManageStats
+//	@x-scalar-ignore	true
+//	@Router			/api/manage/stats [get]
 func (h *HandlerContext) HandleManageStats(w http.ResponseWriter, r *http.Request) {
 	torrents := h.Engine.Client.Torrents()
 	totalPeers := 0
@@ -139,7 +180,7 @@ func (h *HandlerContext) HandleManageStats(w http.ResponseWriter, r *http.Reques
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 
-	writeJSON(w, http.StatusOK, manageStats{
+	writeJSON(w, http.StatusOK, ManageStats{
 		TotalDownload: total.DownloadSpeed,
 		TotalUpload:   total.UploadSpeed,
 		Active:        len(torrents),
@@ -155,11 +196,40 @@ func (h *HandlerContext) HandleManageStats(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-// HandlePinTorrent / HandleUnpinTorrent toggle a torrent's pin (never-reaped, persistent) state. Pinning
-// creates a bare catalog entry if the hash had no metadata, so a UI-added magnet can still be pinned.
+// HandlePinTorrent godoc
+//	@ID			pinTorrent
+//
+//	@Summary		Pin a torrent
+//	@Description	Marks the torrent as pinned: never reaped, survives restart. Creates a bare catalog entry if the hash had no metadata, so a UI-added magnet can still be pinned.
+//	@Tags			Management
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Failure		401		{string}	string	"unauthorized (BasicAuth)"
+//	@Param			hash	path		string	true	"Infohash (40-char hex)"
+//	@Success		200		{object}	handlers.PinResponse
+//	@Failure		400		{string}	string	"invalid torrent hash format"
+//	@Failure		500		{string}	string	"catalog unavailable"
+//	@x-scalar-ignore	true
+//	@Router			/api/manage/torrents/{hash}/pin [post]
 func (h *HandlerContext) HandlePinTorrent(w http.ResponseWriter, r *http.Request) {
 	h.setPinned(w, r, true)
 }
+
+// HandleUnpinTorrent godoc
+//	@ID			unpinTorrent
+//
+//	@Summary		Unpin a torrent
+//	@Description	Clears the pinned state; the torrent becomes reapable by the idle sweeper again.
+//	@Tags			Management
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Failure		401		{string}	string	"unauthorized (BasicAuth)"
+//	@Param			hash	path		string	true	"Infohash (40-char hex)"
+//	@Success		200		{object}	handlers.PinResponse
+//	@Failure		400		{string}	string	"invalid torrent hash format"
+//	@Failure		500		{string}	string	"catalog unavailable"
+//	@x-scalar-ignore	true
+//	@Router			/api/manage/torrents/{hash}/pin [delete]
 func (h *HandlerContext) HandleUnpinTorrent(w http.ResponseWriter, r *http.Request) {
 	h.setPinned(w, r, false)
 }
@@ -176,18 +246,30 @@ func (h *HandlerContext) setPinned(w http.ResponseWriter, r *http.Request, pinne
 		return
 	}
 	e := h.Catalog.SetPinned(hashHex, pinned)
-	writeJSON(w, http.StatusOK, map[string]any{"hash": hashHex, "pinned": e.Pinned})
+	writeJSON(w, http.StatusOK, PinResponse{Hash: hashHex, Pinned: e.Pinned})
 }
 
-type torrentFileNode struct {
+type ManageTorrentFile struct {
 	Path           string `json:"path"`
 	SizeBytes      int64  `json:"sizeBytes"`
 	CompletedBytes int64  `json:"completedBytes"`
 }
 
-// HandleTorrentFiles returns the flat file list of a live torrent (path/size/completed), which the UI's
-// torrent detail page folds into a folder tree. Metadata (name/poster/mediaType) is joined from the
-// catalog so the page has a proper header even for a bare magnet.
+// HandleTorrentFiles godoc
+//	@ID			getManageTorrentFiles
+//
+//	@Summary		Get a torrent's file list
+//	@Description	Flat file list of a live torrent (path/size/completed), which the UI's torrent detail page folds into a folder tree. Metadata (name/poster/mediaType) is joined from the catalog so the page has a proper header even for a bare magnet.
+//	@Tags			Management
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Failure		401		{string}	string	"unauthorized (BasicAuth)"
+//	@Param			hash	path		string	true	"Infohash (40-char hex)"
+//	@Success		200		{object}	handlers.ManageTorrentFilesResponse
+//	@Failure		400		{string}	string	"invalid torrent hash format"
+//	@Failure		404		{string}	string	"torrent not found"
+//	@x-scalar-ignore	true
+//	@Router			/api/manage/torrents/{hash}/files [get]
 func (h *HandlerContext) HandleTorrentFiles(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 	var ih metainfo.Hash
@@ -204,30 +286,29 @@ func (h *HandlerContext) HandleTorrentFiles(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	resp := map[string]any{"hash": hashHex, "name": t.Name(), "ready": t.Info() != nil}
+	resp := ManageTorrentFilesResponse{Hash: hashHex, Name: t.Name(), Ready: t.Info() != nil}
 	if h.Catalog != nil {
 		if e, ok := h.Catalog.Get(hashHex); ok {
 			if e.Title != "" {
-				resp["name"] = e.Title
+				resp.Name = e.Title
 			}
-			resp["poster"] = e.Poster
-			resp["mediaType"] = e.MediaType
-			resp["pinned"] = e.Pinned
-			resp["downloadMode"] = e.DownloadMode
+			resp.Poster = e.Poster
+			resp.MediaType = e.MediaType
+			resp.Pinned = e.Pinned
+			resp.DownloadMode = e.DownloadMode
 		}
 	}
 
-	files := []torrentFileNode{}
+	resp.Files = []ManageTorrentFile{}
 	if t.Info() != nil {
 		for _, f := range t.Files() {
-			files = append(files, torrentFileNode{
+			resp.Files = append(resp.Files, ManageTorrentFile{
 				Path:           f.Path(),
 				SizeBytes:      f.Length(),
 				CompletedBytes: f.BytesCompleted(),
 			})
 		}
 	}
-	resp["files"] = files
 	writeJSON(w, http.StatusOK, resp)
 }
 

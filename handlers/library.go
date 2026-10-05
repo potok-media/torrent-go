@@ -42,9 +42,34 @@ func infohashFromMagnet(magnet string) (string, error) {
 	return "", errors.New("unsupported infohash length")
 }
 
-// HandleSaveLibrary saves ONLY a torrent's metadata (a library entry) — no resolve, no download, no
-// stream. The Add button uses this; downloading to disk is a separate explicit action. Requires a magnet
-// (infohash parsed locally); .torrent URLs must go through the download path since they need fetching.
+// SavedLibraryResponse acknowledges saving a library entry.
+type SavedLibraryResponse struct {
+	Hash  string `json:"hash"`
+	Saved bool   `json:"saved"`
+}
+
+// DownloadStartedResponse acknowledges engaging a saved library entry for disk download.
+type DownloadStartedResponse struct {
+	Hash        string `json:"hash"`
+	Downloading bool   `json:"downloading"`
+}
+
+// HandleSaveLibrary godoc
+//	@ID			saveLibrary
+//
+//	@Summary		Save a torrent to the library
+//	@Description	Saves ONLY a torrent's metadata (a library entry) — no resolve, no download, no stream. Requires a magnet link (the infohash is parsed locally); .torrent URLs must go through the download path since they need fetching.
+//	@Tags			Management
+//	@Accept			json
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Failure		401		{string}	string	"unauthorized (BasicAuth)"
+//	@Param			request	body		handlers.TorrentFilesRequest	true	"Magnet link + optional media metadata"
+//	@Success		200		{object}	handlers.SavedLibraryResponse
+//	@Failure		400		{string}	string	"bad body / magnet required / unreadable infohash"
+//	@Failure		500		{string}	string	"catalog unavailable"
+//	@x-scalar-ignore	true
+//	@Router			/api/manage/library [post]
 func (h *HandlerContext) HandleSaveLibrary(w http.ResponseWriter, r *http.Request) {
 	var req TorrentFilesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -88,12 +113,26 @@ func (h *HandlerContext) HandleSaveLibrary(w http.ResponseWriter, r *http.Reques
 		e.Poster = *req.Poster
 	}
 	h.Catalog.Upsert(e) // DownloadMode stays empty → "saved"
-	writeJSON(w, http.StatusOK, map[string]any{"hash": hash, "saved": true})
+	writeJSON(w, http.StatusOK, SavedLibraryResponse{Hash: hash, Saved: true})
 }
 
-// HandleDownloadSaved engages a saved library entry: resolves its magnet, attaches disk storage, and
-// downloads the whole file to disk in the background. This is the "Download to disk" action for a saved
-// torrent (or from the Add dialog). Idempotent-ish — re-calling just re-prioritises.
+// HandleDownloadSaved godoc
+//	@ID			downloadSaved
+//
+//	@Summary		Download a saved torrent to disk
+//	@Description	Engages a saved library entry: resolves its magnet, attaches disk storage, and downloads the whole file to disk in the background. Idempotent-ish — re-calling just re-prioritises.
+//	@Tags			Management
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Failure		401		{string}	string	"unauthorized (BasicAuth)"
+//	@Param			hash	path		string	true	"Infohash (40-char hex)"
+//	@Success		200		{object}	handlers.DownloadStartedResponse
+//	@Failure		400		{string}	string	"invalid torrent hash format"
+//	@Failure		404		{string}	string	"no saved source for this torrent"
+//	@Failure		500		{string}	string	"catalog unavailable"
+//	@Failure		502		{string}	string	"resolve failed"
+//	@x-scalar-ignore	true
+//	@Router			/api/manage/torrents/{hash}/download [post]
 func (h *HandlerContext) HandleDownloadSaved(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 	if b, err := hex.DecodeString(hashHex); err != nil || len(b) != 20 {
@@ -129,5 +168,5 @@ func (h *HandlerContext) HandleDownloadSaved(w http.ResponseWriter, r *http.Requ
 		case <-time.After(90 * time.Second):
 		}
 	}()
-	writeJSON(w, http.StatusOK, map[string]any{"hash": hashHex, "downloading": true})
+	writeJSON(w, http.StatusOK, DownloadStartedResponse{Hash: hashHex, Downloading: true})
 }

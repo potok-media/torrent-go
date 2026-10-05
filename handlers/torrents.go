@@ -164,6 +164,48 @@ type TorrentFileItem struct {
 	Extension  string  `json:"extension"`
 }
 
+// MetadataTimeoutError is the JSON body returned with HTTP 504 when torrent metadata cannot be
+// resolved in time (unlike every other error on this API, which is text/plain via http.Error).
+type MetadataTimeoutError struct {
+	Error   string `json:"error" example:"METADATA_TIMEOUT"`
+	Message string `json:"message" example:"Failed to download torrent metadata in time. Check seeders/trackers."`
+}
+
+// StatusResponse is the live state of one torrent: speeds, progress, peers and the management-UI
+// enrichment (name/watchers/pinned). State is one of Metadata | Downloading | Seeding.
+type StatusResponse struct {
+	Hash           string  `json:"hash"`
+	State          string  `json:"state" enums:"Metadata,Downloading,Seeding"`
+	Progress       float64 `json:"progress"`
+	Peers          int     `json:"peers"`
+	DownloadSpeed  int64   `json:"downloadSpeed"`
+	UploadSpeed    int64   `json:"uploadSpeed"`
+	Name           string  `json:"name"`
+	TotalBytes     int64   `json:"totalBytes"`
+	CompletedBytes int64   `json:"completedBytes"`
+	Watchers       int     `json:"watchers"`
+	Pinned         bool    `json:"pinned"`
+}
+
+// TorrentDiagnostics is the low-level swarm view of one torrent (piece counts, peer connections).
+type TorrentDiagnostics struct {
+	Hash             string   `json:"hash"`
+	HasInfo          bool     `json:"hasInfo"`
+	TotalPeers       int      `json:"totalPeers"`
+	PendingPeers     int      `json:"pendingPeers"`
+	ActivePeers      int      `json:"activePeers"`
+	ConnectedSeeders int      `json:"connectedSeeders"`
+	HalfOpenPeers    int      `json:"halfOpenPeers"`
+	PiecesComplete   int      `json:"piecesComplete"`
+	NumPieces        int      `json:"numPieces"`
+	PeerConns        []string `json:"peerConns"`
+}
+
+// SuccessResponse is the generic {"success": true} acknowledgement.
+type SuccessResponse struct {
+	Success bool `json:"success"`
+}
+
 type TorrentFilesResponse struct {
 	Hash  *string           `json:"hash"`
 	Items []TorrentFileItem `json:"items"`
@@ -175,6 +217,21 @@ type TorrentFilesResponse struct {
 	SubtitleFiles []TorrentFileItem `json:"subtitleFiles,omitempty"`
 }
 
+// HandleGetFiles godoc
+//	@ID			addTorrentFiles
+//
+//	@Summary		Resolve a torrent and list its media files
+//	@Description	Adds a torrent by magnet URI or .torrent link, waits for metadata, and returns the video/audio/subtitle file lists. Video items keep their true 1-based torrent index in `id`; `audioFiles`/`subtitleFiles` are external sidecar tracks (ext releases) referenced on the HLS master (`?xa=`) / metadata (`?xs=`) URLs.
+//	@Tags			Torrents
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		handlers.TorrentFilesRequest	true	"Torrent source + optional media metadata"
+//	@Success		200		{object}	handlers.TorrentFilesResponse
+//	@Failure		400		{string}	string	"invalid body or missing link/magnetUri"
+//	@Failure		500		{string}	string	"failed to add torrent"
+//	@Failure		504		{object}	handlers.MetadataTimeoutError	"metadata not resolved in time"
+//	@Security
+//	@Router			/api/torrents [post]
 func (h *HandlerContext) HandleGetFiles(w http.ResponseWriter, r *http.Request) {
 	var req TorrentFilesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -370,6 +427,19 @@ func (h *HandlerContext) HandleGetFiles(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(response)
 }
 
+// HandleGetStatus godoc
+//	@ID			getTorrentStatus
+//
+//	@Summary		Get live status of one torrent
+//	@Description	Pure UI stats (peers/speed/progress) plus management-UI enrichment (name/watchers/pinned). Lifetime is owned by playback sessions, not this poll.
+//	@Tags			Torrents
+//	@Produce		json
+//	@Param			hash	path		string	true	"Infohash (40-char hex)"
+//	@Success		200		{object}	handlers.StatusResponse
+//	@Failure		400		{string}	string	"invalid torrent hash format"
+//	@Failure		404		{string}	string	"torrent not found"
+//	@Security
+//	@Router			/api/torrents/{hash} [get]
 func (h *HandlerContext) HandleGetStatus(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 
@@ -419,24 +489,36 @@ func (h *HandlerContext) HandleGetStatus(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	response := map[string]interface{}{
-		"hash":           hashHex,
-		"state":          state,
-		"progress":       progress,
-		"peers":          peers,
-		"downloadSpeed":  speeds.DownloadSpeed,
-		"uploadSpeed":    speeds.UploadSpeed,
-		"name":           name,
-		"totalBytes":     length,
-		"completedBytes": t.BytesCompleted(),
-		"watchers":       h.Watchers(hashHex),
-		"pinned":         pinned,
+	response := StatusResponse{
+		Hash:           hashHex,
+		State:          state,
+		Progress:       progress,
+		Peers:          peers,
+		DownloadSpeed:  speeds.DownloadSpeed,
+		UploadSpeed:    speeds.UploadSpeed,
+		Name:           name,
+		TotalBytes:     length,
+		CompletedBytes: t.BytesCompleted(),
+		Watchers:       h.Watchers(hashHex),
+		Pinned:         pinned,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response)
 }
 
+// HandleDeleteTorrent godoc
+//	@ID			deleteTorrent
+//
+//	@Summary		Drop a torrent
+//	@Description	Force-tears-down the torrent, frees its caches and forgets its catalog metadata. Idempotent: deleting an unknown hash still returns success.
+//	@Tags			Torrents
+//	@Produce		json
+//	@Param			hash	path		string	true	"Infohash (40-char hex)"
+//	@Success		200		{object}	handlers.SuccessResponse
+//	@Failure		400		{string}	string	"invalid torrent hash format"
+//	@Security
+//	@Router			/api/torrents/{hash} [delete]
 func (h *HandlerContext) HandleDeleteTorrent(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 
@@ -454,7 +536,7 @@ func (h *HandlerContext) HandleDeleteTorrent(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	_ = json.NewEncoder(w).Encode(SuccessResponse{Success: true})
 }
 
 // dropTorrent force-tears-down a torrent and frees ALL of its memory: purges its playback sessions,
@@ -526,6 +608,19 @@ func (h *HandlerContext) dropTorrent(infoHash metainfo.Hash, hashHex, reason str
 	}()
 }
 
+// HandleGetDiagnostics godoc
+//	@ID			getTorrentDiagnostics
+//
+//	@Summary		Get swarm diagnostics for one torrent
+//	@Description	Low-level swarm view: peer counts, piece completion, and the raw peer connection list.
+//	@Tags			Torrents
+//	@Produce		json
+//	@Param			hash	path		string	true	"Infohash (40-char hex)"
+//	@Success		200		{object}	handlers.TorrentDiagnostics
+//	@Failure		400		{string}	string	"invalid torrent hash format"
+//	@Failure		404		{string}	string	"torrent not found"
+//	@Security
+//	@Router			/api/torrents/{hash}/diagnostics [get]
 func (h *HandlerContext) HandleGetDiagnostics(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 
@@ -551,17 +646,17 @@ func (h *HandlerContext) HandleGetDiagnostics(w http.ResponseWriter, r *http.Req
 		peersList = append(peersList, pc.String())
 	}
 
-	response := map[string]interface{}{
-		"hash":             hashHex,
-		"hasInfo":          t.Info() != nil,
-		"totalPeers":       stats.TotalPeers,
-		"pendingPeers":     stats.PendingPeers,
-		"activePeers":      stats.ActivePeers,
-		"connectedSeeders": stats.ConnectedSeeders,
-		"halfOpenPeers":    stats.HalfOpenPeers,
-		"piecesComplete":   stats.PiecesComplete,
-		"numPieces":        t.NumPieces(),
-		"peerConns":        peersList,
+	response := TorrentDiagnostics{
+		Hash:             hashHex,
+		HasInfo:          t.Info() != nil,
+		TotalPeers:       stats.TotalPeers,
+		PendingPeers:     stats.PendingPeers,
+		ActivePeers:      stats.ActivePeers,
+		ConnectedSeeders: stats.ConnectedSeeders,
+		HalfOpenPeers:    stats.HalfOpenPeers,
+		PiecesComplete:   stats.PiecesComplete,
+		NumPieces:        t.NumPieces(),
+		PeerConns:        peersList,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

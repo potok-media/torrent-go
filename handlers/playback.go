@@ -46,16 +46,29 @@ func (h *HandlerContext) maxStreams() int {
 	return 0
 }
 
-type playbackKeepalive struct {
+// PlaybackKeepalive is the keepalive body: what one open player instance is watching. sessionId and
+// hash are required; file identifies the current file for the management UI.
+type PlaybackKeepalive struct {
 	SessionID string `json:"sessionId"`
 	Hash      string `json:"hash"`
 	File      string `json:"file"`
 }
 
-// HandlePlaybackKeepalive upserts the caller's session (what it is watching) so the torrent stays alive
-// while a player is open.
+// HandlePlaybackKeepalive godoc
+//	@ID			playbackKeepalive
+//
+//	@Summary		Keep a playback session alive
+//	@Description	Upserts the caller's session (what it is watching) so the torrent stays alive while a player is open. A brand-new session beyond the concurrent-stream cap (derived from the RAM budget) is refused with 429; existing sessions always refresh.
+//	@Tags			Playback
+//	@Accept			json
+//	@Param			request	body	handlers.PlaybackKeepalive	true	"Session presence"
+//	@Success		204		"Session registered/refreshed"
+//	@Failure		400		{string}	string	"bad keepalive (missing sessionId/hash)"
+//	@Failure		429		{string}	string	"too many concurrent streams"
+//	@Security
+//	@Router			/api/playback/keepalive [post]
 func (h *HandlerContext) HandlePlaybackKeepalive(w http.ResponseWriter, r *http.Request) {
-	var req playbackKeepalive
+	var req PlaybackKeepalive
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.SessionID == "" || req.Hash == "" {
 		http.Error(w, "bad keepalive", http.StatusBadRequest)
 		return
@@ -81,8 +94,16 @@ func (h *HandlerContext) HandlePlaybackKeepalive(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// HandlePlaybackStop removes the session (player closed / navigated away). Reads the id from the query so
-// it works with navigator.sendBeacon (no readable body on unload).
+// HandlePlaybackStop godoc
+//	@ID			playbackStop
+//
+//	@Summary		Stop a playback session
+//	@Description	Removes the session (player closed / navigated away). The session id is read from the `sessionId` query parameter first, then from the JSON body — the query form works with navigator.sendBeacon (no readable body on unload). Always 204, even for an unknown/missing id.
+//	@Tags			Playback
+//	@Param			sessionId	query	string	false	"Session id (takes priority over the body)"
+//	@Success		204			"Session removed (or never existed)"
+//	@Security
+//	@Router			/api/playback/stop [post]
 func (h *HandlerContext) HandlePlaybackStop(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("sessionId")
 	if sessionID == "" {

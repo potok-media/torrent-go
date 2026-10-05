@@ -8,10 +8,32 @@ import (
 	"time"
 )
 
-// HandleTmdbLookup resolves a TMDB id to a title + poster URL + year for the Add-torrent dialog, so the
-// user can pre-fill a torrent's media card from a TMDB id instead of typing everything. It proxies TMDB
-// (v3 api_key from TMDB_API_KEY) so no key is exposed to the browser. Returns 501 if no key is set —
-// manual title/poster entry still works without it.
+// TmdbLookupResponse is the pre-fill data for the Add-torrent dialog resolved from a TMDB id.
+type TmdbLookupResponse struct {
+	Title     string `json:"title"`
+	Poster    string `json:"poster"`
+	Year      string `json:"year"`
+	MediaType string `json:"mediaType" enums:"movie,tv"`
+	TmdbID    string `json:"tmdbId"`
+}
+
+// HandleTmdbLookup godoc
+//	@ID			tmdbLookup
+//
+//	@Summary		Look up title/poster by TMDB id
+//	@Description	Resolves a TMDB id to a title + poster URL + year for the Add-torrent dialog. Proxies TMDB (v3 api_key from TMDB_API_KEY) so no key is exposed to the browser. Returns 501 if no key is set — manual title/poster entry still works without it.
+//	@Tags			Management
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Failure		401		{string}	string	"unauthorized (BasicAuth)"
+//	@Param			id		query		string	true	"TMDB id"
+//	@Param			type	query		string	false	"movie (default) | tv"	Enums(movie, tv)
+//	@Success		200		{object}	handlers.TmdbLookupResponse
+//	@Failure		400		{string}	string	"id required"
+//	@Failure		501		{string}	string	"TMDB not configured (set TMDB_API_KEY)"
+//	@Failure		502		{string}	string	"TMDB request/lookup failed"
+//	@x-scalar-ignore	true
+//	@Router			/api/manage/tmdb [get]
 func (h *HandlerContext) HandleTmdbLookup(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -73,7 +95,7 @@ func (h *HandlerContext) HandleTmdbLookup(w http.ResponseWriter, r *http.Request
 		poster = "https://image.tmdb.org/t/p/w500" + m.PosterPath
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"title": title, "poster": poster, "year": year, "mediaType": mediaType, "tmdbId": id,
+	writeJSON(w, http.StatusOK, TmdbLookupResponse{
+		Title: title, Poster: poster, Year: year, MediaType: mediaType, TmdbID: id,
 	})
 }

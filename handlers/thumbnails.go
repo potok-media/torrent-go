@@ -125,6 +125,22 @@ func NewThumbnailService(maxSize int, ttl time.Duration) *ThumbnailService {
 	}
 }
 
+// HandleGetThumbnail godoc
+//	@ID			getThumbnail
+//
+//	@Summary		Extract a JPEG thumbnail at a timestamp
+//	@Description	Seeks in-process to `time` (rounded to a 5-second bucket) and returns a 160x90 JPEG. Results are LRU-cached; concurrent requests for the same bucket are coalesced.
+//	@Tags			Media
+//	@Produce		jpeg
+//	@Param			hash		path		string	true	"Infohash (40-char hex)"
+//	@Param			fileIndex	path		int		true	"File index in the torrent (1-based)"
+//	@Param			time		query		number	false	"Timestamp in seconds (rounded to the nearest 5s)"
+//	@Success		200			{string}		binary	"JPEG image (160x90)"
+//	@Failure		400			{string}	string	"invalid hash or file index"
+//	@Failure		404			{string}	string	"torrent not active"
+//	@Failure		500			{string}	string	"thumbnail extraction failed"
+//	@Security
+//	@Router			/api/torrents/{hash}/files/{fileIndex}/thumbnail [get]
 func (h *HandlerContext) HandleGetThumbnail(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 	fileIndexStr := chi.URLParam(r, "fileIndex")

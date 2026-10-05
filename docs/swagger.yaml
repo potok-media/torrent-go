@@ -1,0 +1,1687 @@
+basePath: /
+definitions:
+  handlers.ClientMetadata:
+    properties:
+      duration:
+        type: number
+      introEnd:
+        type: number
+      introStart:
+        type: number
+      outroEnd:
+        type: number
+      outroStart:
+        type: number
+      success:
+        type: boolean
+      tracks:
+        items:
+          $ref: '#/definitions/handlers.ClientTrack'
+        type: array
+    type: object
+  handlers.ClientTrack:
+    properties:
+      codec:
+        type: string
+      index:
+        type: integer
+      language:
+        type: string
+      relIndex:
+        type: integer
+      sourceFile:
+        description: |-
+          SourceFile is 0 for a track embedded in this video file (addressed by RelIndex within the container). For
+          an EXTERNAL subtitle file (a separate file in the torrent, "ext" releases), it holds that file's true
+          1-based torrent index so the plugin builds its src against the external-file endpoint, not the embedded
+          subtitles/{rel} path.
+        type: integer
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  handlers.DiagnosticsResponse:
+    properties:
+      disk:
+        $ref: '#/definitions/handlers.DiskDiagnostics'
+      hlsCache:
+        $ref: '#/definitions/handlers.HlsCacheDiagnostics'
+      pieceCache:
+        $ref: '#/definitions/handlers.PieceCacheDiagnostics'
+      runtime:
+        $ref: '#/definitions/handlers.RuntimeDiagnostics'
+      sessions:
+        $ref: '#/definitions/handlers.SessionDiagnostics'
+      thumbCache:
+        $ref: '#/definitions/handlers.ThumbCacheDiagnostics'
+      torrents:
+        items:
+          $ref: '#/definitions/handlers.DiagnosticsTorrentEntry'
+        type: array
+      transcoders:
+        $ref: '#/definitions/handlers.TranscoderDiagnostics'
+    type: object
+  handlers.DiagnosticsTorrentEntry:
+    properties:
+      activePeers:
+        type: integer
+      cacheBytes:
+        type: integer
+      diskBytes:
+        type: integer
+      downloadMode:
+        type: string
+      hash:
+        type: string
+      name:
+        type: string
+      numPieces:
+        type: integer
+      piecesComplete:
+        type: integer
+      pinned:
+        type: boolean
+      watchers:
+        type: integer
+    type: object
+  handlers.DiskDiagnostics:
+    properties:
+      dir:
+        type: string
+      free:
+        type: integer
+      used:
+        type: integer
+    type: object
+  handlers.DownloadStartedResponse:
+    properties:
+      downloading:
+        type: boolean
+      hash:
+        type: string
+    type: object
+  handlers.HlsCacheDiagnostics:
+    properties:
+      bytes:
+        type: integer
+      count:
+        type: integer
+      max:
+        type: integer
+    type: object
+  handlers.ManageStats:
+    properties:
+      active:
+        type: integer
+      activeStreams:
+        type: integer
+      cacheCapacity:
+        type: integer
+      cacheFilled:
+        type: integer
+      heapBytes:
+        type: integer
+      maxStreams:
+        type: integer
+      sessions:
+        type: integer
+      streaming:
+        type: integer
+      sysBytes:
+        type: integer
+      totalDownload:
+        type: integer
+      totalPeers:
+        type: integer
+      totalUpload:
+        type: integer
+    type: object
+  handlers.ManageTorrent:
+    properties:
+      activePeers:
+        type: integer
+      completedBytes:
+        type: integer
+      currentFile:
+        type: string
+      downloadMode:
+        enum:
+        - stream
+        - disk
+        type: string
+      downloadSpeed:
+        type: integer
+      hash:
+        type: string
+      mediaType:
+        type: string
+      name:
+        type: string
+      pinned:
+        type: boolean
+      poster:
+        type: string
+      progress:
+        type: number
+      seeders:
+        type: integer
+      sizeBytes:
+        type: integer
+      state:
+        enum:
+        - Metadata
+        - Downloading
+        - Seeding
+        - Saved
+        type: string
+      uploadSpeed:
+        type: integer
+      watchers:
+        type: integer
+    type: object
+  handlers.ManageTorrentFile:
+    properties:
+      completedBytes:
+        type: integer
+      path:
+        type: string
+      sizeBytes:
+        type: integer
+    type: object
+  handlers.ManageTorrentFilesResponse:
+    properties:
+      downloadMode:
+        type: string
+      files:
+        items:
+          $ref: '#/definitions/handlers.ManageTorrentFile'
+        type: array
+      hash:
+        type: string
+      mediaType:
+        type: string
+      name:
+        type: string
+      pinned:
+        type: boolean
+      poster:
+        type: string
+      ready:
+        type: boolean
+    type: object
+  handlers.MetadataTimeoutError:
+    properties:
+      error:
+        example: METADATA_TIMEOUT
+        type: string
+      message:
+        example: Failed to download torrent metadata in time. Check seeders/trackers.
+        type: string
+    type: object
+  handlers.PieceCacheDiagnostics:
+    properties:
+      capacity:
+        type: integer
+      filled:
+        type: integer
+    type: object
+  handlers.PinResponse:
+    properties:
+      hash:
+        type: string
+      pinned:
+        type: boolean
+    type: object
+  handlers.PlaybackKeepalive:
+    properties:
+      file:
+        type: string
+      hash:
+        type: string
+      sessionId:
+        type: string
+    type: object
+  handlers.RuntimeDiagnostics:
+    properties:
+      gcCPUFraction:
+        type: number
+      heapAlloc:
+        type: integer
+      heapSys:
+        type: integer
+      memLimitBytes:
+        type: integer
+      numGC:
+        type: integer
+      numGoroutine:
+        type: integer
+      stackSys:
+        type: integer
+      sys:
+        type: integer
+      uptimeSec:
+        type: integer
+    type: object
+  handlers.SavedLibraryResponse:
+    properties:
+      hash:
+        type: string
+      saved:
+        type: boolean
+    type: object
+  handlers.SessionDiagnostics:
+    properties:
+      active:
+        type: integer
+      maxStreams:
+        type: integer
+      perStreamBytes:
+        type: integer
+      streaming:
+        type: integer
+    type: object
+  handlers.Settings:
+    properties:
+      cacheBudgetBytes:
+        type: integer
+      cacheFilled:
+        type: integer
+      maxAudioTranscoders:
+        type: integer
+      maxStreams:
+        type: integer
+      minBudgetBytes:
+        type: integer
+      perStreamBytes:
+        type: integer
+    type: object
+  handlers.SettingsUpdate:
+    properties:
+      cacheBudgetBytes:
+        type: integer
+    type: object
+  handlers.StatusResponse:
+    properties:
+      completedBytes:
+        type: integer
+      downloadSpeed:
+        type: integer
+      hash:
+        type: string
+      name:
+        type: string
+      peers:
+        type: integer
+      pinned:
+        type: boolean
+      progress:
+        type: number
+      state:
+        enum:
+        - Metadata
+        - Downloading
+        - Seeding
+        type: string
+      totalBytes:
+        type: integer
+      uploadSpeed:
+        type: integer
+      watchers:
+        type: integer
+    type: object
+  handlers.SuccessResponse:
+    properties:
+      success:
+        type: boolean
+    type: object
+  handlers.ThumbCacheDiagnostics:
+    properties:
+      bytes:
+        type: integer
+      count:
+        type: integer
+      max:
+        type: integer
+    type: object
+  handlers.TmdbLookupResponse:
+    properties:
+      mediaType:
+        enum:
+        - movie
+        - tv
+        type: string
+      poster:
+        type: string
+      title:
+        type: string
+      tmdbId:
+        type: string
+      year:
+        type: string
+    type: object
+  handlers.TorrentDiagnostics:
+    properties:
+      activePeers:
+        type: integer
+      connectedSeeders:
+        type: integer
+      halfOpenPeers:
+        type: integer
+      hasInfo:
+        type: boolean
+      hash:
+        type: string
+      numPieces:
+        type: integer
+      peerConns:
+        items:
+          type: string
+        type: array
+      pendingPeers:
+        type: integer
+      piecesComplete:
+        type: integer
+      totalPeers:
+        type: integer
+    type: object
+  handlers.TorrentFileItem:
+    properties:
+      extension:
+        type: string
+      folderName:
+        type: string
+      id:
+        type: string
+      isSerial:
+        type: boolean
+      path:
+        type: string
+      sizeBytes:
+        type: integer
+      sizeLabel:
+        type: string
+      title:
+        type: string
+    type: object
+  handlers.TorrentFilesRequest:
+    properties:
+      downloadMode:
+        description: |-
+          DownloadMode selects storage: "disk" persists the whole file to POTOK_DOWNLOAD_DIR (survives
+          restart, plays without re-buffering); anything else / omitted = "stream" (RAM cache only).
+        type: string
+      englishTitle:
+        type: string
+      link:
+        type: string
+      magnetUri:
+        type: string
+      mediaType:
+        type: string
+      numberOfSeasons:
+        type: integer
+      originalTitle:
+        type: string
+      poster:
+        type: string
+      title:
+        type: string
+      tmdbId:
+        type: integer
+    type: object
+  handlers.TorrentFilesResponse:
+    properties:
+      audioFiles:
+        description: |-
+          External (sidecar) tracks for "ext" releases: dub audio / subtitle files that live as SEPARATE files in
+          the torrent (folders next to the .mkv) instead of muxed in. They keep their true 1-based torrent index in
+          Id, so the plugin can reference them on the HLS master (?xa=) / metadata (?xs=) URLs. The video Items list
+          is unchanged — the plugin's episode-mapping never sees these.
+        items:
+          $ref: '#/definitions/handlers.TorrentFileItem'
+        type: array
+      hash:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/handlers.TorrentFileItem'
+        type: array
+      subtitleFiles:
+        items:
+          $ref: '#/definitions/handlers.TorrentFileItem'
+        type: array
+    type: object
+  handlers.TranscoderDiagnostics:
+    properties:
+      count:
+        type: integer
+      estBytes:
+        type: integer
+      max:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: |-
+    Standalone BitTorrent streaming engine for Potok: torrent metadata, direct streaming, HLS, subtitles, thumbnails, and an optional management web UI.
+    The plugin/streaming routes are open (players hit them without credentials); the /api/manage/* contour is mounted only with TORRENTGO_ENABLE_WEBUI=true and protected by HTTP Basic auth. Errors are text/plain (via http.Error) unless noted otherwise.
+  title: Potok TorrentGo API
+  version: "2.0"
+paths:
+  /api/manage/diagnostics:
+    get:
+      description: A full accounting of where RAM (and disk) goes — the Go runtime
+        heap, the global piece cache (with per-torrent breakdown), the HLS segment
+        cache, the thumbnail cache, live AAC transcoders, playback sessions, and disk
+        usage. Everything the operator needs to see "what is eating memory" in one
+        place.
+      operationId: getDiagnostics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.DiagnosticsResponse'
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Full memory/disk diagnostics
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/manage/library:
+    post:
+      consumes:
+      - application/json
+      description: Saves ONLY a torrent's metadata (a library entry) — no resolve,
+        no download, no stream. Requires a magnet link (the infohash is parsed locally);
+        .torrent URLs must go through the download path since they need fetching.
+      operationId: saveLibrary
+      parameters:
+      - description: Magnet link + optional media metadata
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TorrentFilesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SavedLibraryResponse'
+        "400":
+          description: bad body / magnet required / unreadable infohash
+          schema:
+            type: string
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+        "500":
+          description: catalog unavailable
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Save a torrent to the library
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/manage/settings:
+    get:
+      description: The global RAM budget plus the derived limits (max concurrent streams,
+        audio transcoder cap) and the current cache fill.
+      operationId: getSettings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.Settings'
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Get cache settings
+      tags:
+      - Management
+      x-scalar-ignore: true
+    post:
+      consumes:
+      - application/json
+      description: Updates the global piece-cache budget (bytes, positive; clamped
+        to the minimum, evicts down), persists it to DataDir/settings.json, and returns
+        the effective settings.
+      operationId: setSettings
+      parameters:
+      - description: New RAM budget
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SettingsUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.Settings'
+        "400":
+          description: cacheBudgetBytes (positive) required
+          schema:
+            type: string
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Set the global RAM budget
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/manage/stats:
+    get:
+      description: Summed speeds, torrent/session counts, the GLOBAL piece-cache fill,
+        Go heap/sys memory, and the concurrent-stream cap.
+      operationId: getManageStats
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ManageStats'
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Aggregate engine KPIs
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/manage/tmdb:
+    get:
+      description: Resolves a TMDB id to a title + poster URL + year for the Add-torrent
+        dialog. Proxies TMDB (v3 api_key from TMDB_API_KEY) so no key is exposed to
+        the browser. Returns 501 if no key is set — manual title/poster entry still
+        works without it.
+      operationId: tmdbLookup
+      parameters:
+      - description: TMDB id
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: movie (default) | tv
+        enum:
+        - movie
+        - tv
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TmdbLookupResponse'
+        "400":
+          description: id required
+          schema:
+            type: string
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+        "501":
+          description: TMDB not configured (set TMDB_API_KEY)
+          schema:
+            type: string
+        "502":
+          description: TMDB request/lookup failed
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Look up title/poster by TMDB id
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/manage/torrents:
+    get:
+      description: Every live torrent joined with its remembered metadata, speeds,
+        peers and watcher count, plus saved library entries (State "Saved") — the
+        dashboard's main feed.
+      operationId: listTorrents
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.ManageTorrent'
+            type: array
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: List all torrents
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/manage/torrents/{hash}/download:
+    post:
+      description: 'Engages a saved library entry: resolves its magnet, attaches disk
+        storage, and downloads the whole file to disk in the background. Idempotent-ish
+        — re-calling just re-prioritises.'
+      operationId: downloadSaved
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.DownloadStartedResponse'
+        "400":
+          description: invalid torrent hash format
+          schema:
+            type: string
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+        "404":
+          description: no saved source for this torrent
+          schema:
+            type: string
+        "500":
+          description: catalog unavailable
+          schema:
+            type: string
+        "502":
+          description: resolve failed
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Download a saved torrent to disk
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/manage/torrents/{hash}/files:
+    get:
+      description: Flat file list of a live torrent (path/size/completed), which the
+        UI's torrent detail page folds into a folder tree. Metadata (name/poster/mediaType)
+        is joined from the catalog so the page has a proper header even for a bare
+        magnet.
+      operationId: getManageTorrentFiles
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ManageTorrentFilesResponse'
+        "400":
+          description: invalid torrent hash format
+          schema:
+            type: string
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+        "404":
+          description: torrent not found
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Get a torrent's file list
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/manage/torrents/{hash}/pin:
+    delete:
+      description: Clears the pinned state; the torrent becomes reapable by the idle
+        sweeper again.
+      operationId: unpinTorrent
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.PinResponse'
+        "400":
+          description: invalid torrent hash format
+          schema:
+            type: string
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+        "500":
+          description: catalog unavailable
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Unpin a torrent
+      tags:
+      - Management
+      x-scalar-ignore: true
+    post:
+      description: 'Marks the torrent as pinned: never reaped, survives restart. Creates
+        a bare catalog entry if the hash had no metadata, so a UI-added magnet can
+        still be pinned.'
+      operationId: pinTorrent
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.PinResponse'
+        "400":
+          description: invalid torrent hash format
+          schema:
+            type: string
+        "401":
+          description: unauthorized (BasicAuth)
+          schema:
+            type: string
+        "500":
+          description: catalog unavailable
+          schema:
+            type: string
+      security:
+      - BasicAuth: []
+      summary: Pin a torrent
+      tags:
+      - Management
+      x-scalar-ignore: true
+  /api/playback/keepalive:
+    post:
+      consumes:
+      - application/json
+      description: Upserts the caller's session (what it is watching) so the torrent
+        stays alive while a player is open. A brand-new session beyond the concurrent-stream
+        cap (derived from the RAM budget) is refused with 429; existing sessions always
+        refresh.
+      operationId: playbackKeepalive
+      parameters:
+      - description: Session presence
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlaybackKeepalive'
+      responses:
+        "204":
+          description: Session registered/refreshed
+        "400":
+          description: bad keepalive (missing sessionId/hash)
+          schema:
+            type: string
+        "429":
+          description: too many concurrent streams
+          schema:
+            type: string
+      security: []
+      summary: Keep a playback session alive
+      tags:
+      - Playback
+  /api/playback/stop:
+    post:
+      description: Removes the session (player closed / navigated away). The session
+        id is read from the `sessionId` query parameter first, then from the JSON
+        body — the query form works with navigator.sendBeacon (no readable body on
+        unload). Always 204, even for an unknown/missing id.
+      operationId: playbackStop
+      parameters:
+      - description: Session id (takes priority over the body)
+        in: query
+        name: sessionId
+        type: string
+      responses:
+        "204":
+          description: Session removed (or never existed)
+      security: []
+      summary: Stop a playback session
+      tags:
+      - Playback
+  /api/torrents:
+    post:
+      consumes:
+      - application/json
+      description: Adds a torrent by magnet URI or .torrent link, waits for metadata,
+        and returns the video/audio/subtitle file lists. Video items keep their true
+        1-based torrent index in `id`; `audioFiles`/`subtitleFiles` are external sidecar
+        tracks (ext releases) referenced on the HLS master (`?xa=`) / metadata (`?xs=`)
+        URLs.
+      operationId: addTorrentFiles
+      parameters:
+      - description: Torrent source + optional media metadata
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TorrentFilesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TorrentFilesResponse'
+        "400":
+          description: invalid body or missing link/magnetUri
+          schema:
+            type: string
+        "500":
+          description: failed to add torrent
+          schema:
+            type: string
+        "504":
+          description: metadata not resolved in time
+          schema:
+            $ref: '#/definitions/handlers.MetadataTimeoutError'
+      security: []
+      summary: Resolve a torrent and list its media files
+      tags:
+      - Torrents
+  /api/torrents/{hash}:
+    delete:
+      description: 'Force-tears-down the torrent, frees its caches and forgets its
+        catalog metadata. Idempotent: deleting an unknown hash still returns success.'
+      operationId: deleteTorrent
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SuccessResponse'
+        "400":
+          description: invalid torrent hash format
+          schema:
+            type: string
+      security: []
+      summary: Drop a torrent
+      tags:
+      - Torrents
+    get:
+      description: Pure UI stats (peers/speed/progress) plus management-UI enrichment
+        (name/watchers/pinned). Lifetime is owned by playback sessions, not this poll.
+      operationId: getTorrentStatus
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "400":
+          description: invalid torrent hash format
+          schema:
+            type: string
+        "404":
+          description: torrent not found
+          schema:
+            type: string
+      security: []
+      summary: Get live status of one torrent
+      tags:
+      - Torrents
+  /api/torrents/{hash}/diagnostics:
+    get:
+      description: 'Low-level swarm view: peer counts, piece completion, and the raw
+        peer connection list.'
+      operationId: getTorrentDiagnostics
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TorrentDiagnostics'
+        "400":
+          description: invalid torrent hash format
+          schema:
+            type: string
+        "404":
+          description: torrent not found
+          schema:
+            type: string
+      security: []
+      summary: Get swarm diagnostics for one torrent
+      tags:
+      - Torrents
+  /api/torrents/{hash}/files/{fileIndex}/hls/{hlsPath}:
+    get:
+      description: |-
+        One wildcard operation covering the whole HLS4 tree. The `{hlsPath}` wildcard selects the artifact:
+
+        - `master.m3u8` — multivariant playlist: one video variant plus EXT-X-MEDIA AUDIO/SUBTITLES renditions. `?xa=<idx,idx>` appends EXTERNAL audio renditions demuxed from separate torrent files (1-based indices).
+        - `v/index.m3u8`, `v/init.mp4`, `v/seg{N}.m4s` — audio-agnostic video rendition (fMP4, shared init via EXT-X-MAP).
+        - `a/{rel}/index.m3u8`, `a/{rel}/init.mp4`, `a/{rel}/seg{N}.m4s` — embedded audio track `rel` (0-based relIndex from /metadata). Non-AAC tracks are transcoded to AAC on the fly.
+        - `s/{rel}/index.m3u8`, `s/{rel}/seg{N}.vtt` — embedded subtitle track `rel` as WebVTT (no init).
+        - `xa/{extIdx}/{rel}/index.m3u8|init.mp4|seg{N}.m4s` — external audio rendition demuxed from torrent file `extIdx` (1-based), reusing the video file's segment grid.
+
+        Every rendition shares one VOD segment grid so timelines align. Segments/init are produced on demand, in-process (libav over the RAM torrent cache), and served from a rolling LRU with `Cache-Control: immutable`. Content types: playlists `application/vnd.apple.mpegurl`, init/segments `video/mp4`, subtitles `text/vtt`.
+      operationId: getHls
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: Video file index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: HLS artifact path, e.g. master.m3u8, v/seg12.m4s, a/0/index.m3u8,
+          s/1/seg3.vtt, xa/7/0/init.mp4
+        in: path
+        name: hlsPath
+        required: true
+        type: string
+      - description: 'master.m3u8 only: external audio files (1-based torrent indices,
+          comma-separated)'
+        in: query
+        name: xa
+        type: string
+      responses:
+        "200":
+          description: Playlist (application/vnd.apple.mpegurl), fMP4 init/segment
+            (video/mp4) or WebVTT segment (text/vtt)
+          schema:
+            type: string
+        "404":
+          description: unknown HLS path or segment index
+          schema:
+            type: string
+        "500":
+          description: hls unavailable / segment produce failed
+          schema:
+            type: string
+      security: []
+      summary: HLS multivariant delivery (master playlist, renditions, segments)
+      tags:
+      - HLS
+  /api/torrents/{hash}/files/{fileIndex}/metadata:
+    get:
+      description: 'In-process (libav) probe of one file in the torrent: duration,
+        audio/subtitle tracks (relIndex is the rendition index used in HLS `a/{rel}/…`,
+        `s/{rel}/…` URIs), and intro/outro timecodes when known. The `xs` query folds
+        EXTERNAL sidecar subtitle files (1-based torrent indices, comma-separated)
+        into the track list as `sourceFile`-carrying tracks.'
+      operationId: getMediaMetadata
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: File index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: External subtitle files to include (1-based torrent indices,
+          comma-separated)
+        in: query
+        name: xs
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ClientMetadata'
+        "500":
+          description: probe failed
+          schema:
+            type: string
+      security: []
+      summary: Probe a video file's tracks and playback metadata
+      tags:
+      - Media
+  /api/torrents/{hash}/files/{fileIndex}/stream:
+    get:
+      description: Serves the raw container bytes straight from the RAM piece cache
+        with HTTP Range support (200 full body / 206 partial / 416 unsatisfiable).
+        Waits up to 30s for unresolved torrent metadata (504 on timeout). `raw=true`
+        skips the preload bookkeeping; `class` selects the read priority (playback
+        | ahead | cold | patient; legacy `bg=1` maps to ahead); `deadline` (unix milliseconds)
+        caps the reader's wait. An optional cosmetic `/{filename}` suffix is accepted
+        on both route shapes (e.g. /api/torrents/{hash}/files/{fileIndex}/stream/movie.mkv).
+        HEAD is supported on both shapes. Adaptive playback is handled by the HLS
+        endpoint instead.
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: File index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: raw=true — serve progressive bytes without preload bookkeeping
+        in: query
+        name: raw
+        type: boolean
+      - description: 'Read class: playback | ahead | cold | patient'
+        enum:
+        - playback
+        - ahead
+        - cold
+        - patient
+        in: query
+        name: class
+        type: string
+      - description: 'Legacy: bg=1 → ahead read class'
+        in: query
+        name: bg
+        type: string
+      - description: Caller deadline as unix milliseconds — caps the reader's wait
+        in: query
+        name: deadline
+        type: integer
+      - description: HTTP Range header (e.g. bytes=0-)
+        in: header
+        name: Range
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Full body
+          schema:
+            type: string
+        "206":
+          description: Partial content (Content-Range)
+          schema:
+            type: string
+        "400":
+          description: invalid hash or file index
+          schema:
+            type: string
+        "404":
+          description: torrent not active
+          schema:
+            type: string
+        "416":
+          description: range not satisfiable
+          schema:
+            type: string
+        "500":
+          description: storage cache not found
+          schema:
+            type: string
+        "504":
+          description: timeout waiting for torrent metadata (30s)
+          schema:
+            type: string
+      security: []
+      summary: Progressive download of a torrent file
+      tags:
+      - Streaming
+    head:
+      description: Serves the raw container bytes straight from the RAM piece cache
+        with HTTP Range support (200 full body / 206 partial / 416 unsatisfiable).
+        Waits up to 30s for unresolved torrent metadata (504 on timeout). `raw=true`
+        skips the preload bookkeeping; `class` selects the read priority (playback
+        | ahead | cold | patient; legacy `bg=1` maps to ahead); `deadline` (unix milliseconds)
+        caps the reader's wait. An optional cosmetic `/{filename}` suffix is accepted
+        on both route shapes (e.g. /api/torrents/{hash}/files/{fileIndex}/stream/movie.mkv).
+        HEAD is supported on both shapes. Adaptive playback is handled by the HLS
+        endpoint instead.
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: File index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: raw=true — serve progressive bytes without preload bookkeeping
+        in: query
+        name: raw
+        type: boolean
+      - description: 'Read class: playback | ahead | cold | patient'
+        enum:
+        - playback
+        - ahead
+        - cold
+        - patient
+        in: query
+        name: class
+        type: string
+      - description: 'Legacy: bg=1 → ahead read class'
+        in: query
+        name: bg
+        type: string
+      - description: Caller deadline as unix milliseconds — caps the reader's wait
+        in: query
+        name: deadline
+        type: integer
+      - description: HTTP Range header (e.g. bytes=0-)
+        in: header
+        name: Range
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Full body
+          schema:
+            type: string
+        "206":
+          description: Partial content (Content-Range)
+          schema:
+            type: string
+        "400":
+          description: invalid hash or file index
+          schema:
+            type: string
+        "404":
+          description: torrent not active
+          schema:
+            type: string
+        "416":
+          description: range not satisfiable
+          schema:
+            type: string
+        "500":
+          description: storage cache not found
+          schema:
+            type: string
+        "504":
+          description: timeout waiting for torrent metadata (30s)
+          schema:
+            type: string
+      security: []
+      summary: Progressive download of a torrent file
+      tags:
+      - Streaming
+  /api/torrents/{hash}/files/{fileIndex}/subtitle-file:
+    get:
+      description: Reads a WHOLE sidecar subtitle file (a separate file in the torrent,
+        "ext" releases) by its 1-based torrent index and converts SRT to WebVTT (ASS/SSA/VTT
+        pass through unchanged). Unlike /subtitles/{trackIndex}, no embedded-track
+        demux is involved; `?start=` is ignored (sub files are tiny, the player's
+        windowed feeder dedupes cues).
+      operationId: getExternalSubtitleFile
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: Torrent index of the subtitle file itself (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Subtitle body (text/vtt, text/x-ssa or text/plain)
+          schema:
+            type: string
+        "500":
+          description: subtitle file unavailable / read failed
+          schema:
+            type: string
+      security: []
+      summary: Serve an external (sidecar) subtitle file
+      tags:
+      - Media
+  /api/torrents/{hash}/files/{fileIndex}/subtitles/{trackIndex}:
+    get:
+      description: 'Demuxes an embedded text subtitle track (0-based trackIndex =
+        subtitle relIndex from /metadata) and serves it as WebVTT (default), ASS/SSA
+        or SRT depending on `format`. With `start` the extraction is windowed around
+        the playhead; a window whose pieces are not downloaded yet returns 202 + `Retry-After:
+        2` and the client retries as playback nears. Responses carry a content ETag
+        — conditional re-requests get 304. Also mounted at the legacy path /stream/{hash}/{fileIndex}/subtitles/{trackIndex}.'
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: File index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: Subtitle track index (0-based, per-file subtitle relIndex)
+        in: path
+        name: trackIndex
+        required: true
+        type: integer
+      - description: 'Output format: webvtt (default) | ass | srt'
+        in: query
+        name: format
+        type: string
+      - description: Playhead seconds — extract only the windowed time-slice around
+          it
+        in: query
+        name: start
+        type: number
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Subtitle body (text/vtt, text/x-ssa or text/srt)
+          schema:
+            type: string
+        "202":
+          description: Window not downloaded yet — retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              type: integer
+          schema:
+            type: string
+        "304":
+          description: Not modified (matching ETag)
+          schema:
+            type: string
+        "500":
+          description: subtitle extraction failed
+          schema:
+            type: string
+      security: []
+      summary: Extract an embedded subtitle track
+      tags:
+      - Media
+  /api/torrents/{hash}/files/{fileIndex}/thumbnail:
+    get:
+      description: Seeks in-process to `time` (rounded to a 5-second bucket) and returns
+        a 160x90 JPEG. Results are LRU-cached; concurrent requests for the same bucket
+        are coalesced.
+      operationId: getThumbnail
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: File index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: Timestamp in seconds (rounded to the nearest 5s)
+        in: query
+        name: time
+        type: number
+      produces:
+      - image/jpeg
+      responses:
+        "200":
+          description: JPEG image (160x90)
+          schema:
+            type: string
+        "400":
+          description: invalid hash or file index
+          schema:
+            type: string
+        "404":
+          description: torrent not active
+          schema:
+            type: string
+        "500":
+          description: thumbnail extraction failed
+          schema:
+            type: string
+      security: []
+      summary: Extract a JPEG thumbnail at a timestamp
+      tags:
+      - Media
+  /docs:
+    get:
+      description: Serves the Scalar API-reference page rendering /openapi.yaml.
+      operationId: getApiDocs
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: Scalar HTML page
+          schema:
+            type: string
+      security: []
+      summary: Interactive API documentation (Scalar UI)
+      tags:
+      - System
+  /health:
+    get:
+      description: Liveness probe; always 200 with the plain-text body "OK".
+      operationId: healthCheck
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      security: []
+      summary: Health check
+      tags:
+      - System
+  /openapi.yaml:
+    get:
+      description: Serves the generated OpenAPI (Swagger 2.0) YAML embedded in the
+        binary.
+      operationId: getOpenAPISpec
+      produces:
+      - application/yaml
+      responses:
+        "200":
+          description: OpenAPI YAML
+          schema:
+            type: string
+      security: []
+      summary: OpenAPI specification
+      tags:
+      - System
+  /stream/{hash}/{fileIndex}:
+    get:
+      description: Serves the raw container bytes straight from the RAM piece cache
+        with HTTP Range support (200 full body / 206 partial / 416 unsatisfiable).
+        Waits up to 30s for unresolved torrent metadata (504 on timeout). `raw=true`
+        skips the preload bookkeeping; `class` selects the read priority (playback
+        | ahead | cold | patient; legacy `bg=1` maps to ahead); `deadline` (unix milliseconds)
+        caps the reader's wait. An optional cosmetic `/{filename}` suffix is accepted
+        on both route shapes (e.g. /api/torrents/{hash}/files/{fileIndex}/stream/movie.mkv).
+        HEAD is supported on both shapes. Adaptive playback is handled by the HLS
+        endpoint instead.
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: File index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: raw=true — serve progressive bytes without preload bookkeeping
+        in: query
+        name: raw
+        type: boolean
+      - description: 'Read class: playback | ahead | cold | patient'
+        enum:
+        - playback
+        - ahead
+        - cold
+        - patient
+        in: query
+        name: class
+        type: string
+      - description: 'Legacy: bg=1 → ahead read class'
+        in: query
+        name: bg
+        type: string
+      - description: Caller deadline as unix milliseconds — caps the reader's wait
+        in: query
+        name: deadline
+        type: integer
+      - description: HTTP Range header (e.g. bytes=0-)
+        in: header
+        name: Range
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Full body
+          schema:
+            type: string
+        "206":
+          description: Partial content (Content-Range)
+          schema:
+            type: string
+        "400":
+          description: invalid hash or file index
+          schema:
+            type: string
+        "404":
+          description: torrent not active
+          schema:
+            type: string
+        "416":
+          description: range not satisfiable
+          schema:
+            type: string
+        "500":
+          description: storage cache not found
+          schema:
+            type: string
+        "504":
+          description: timeout waiting for torrent metadata (30s)
+          schema:
+            type: string
+      security: []
+      summary: Progressive download of a torrent file
+      tags:
+      - Streaming
+    head:
+      description: Serves the raw container bytes straight from the RAM piece cache
+        with HTTP Range support (200 full body / 206 partial / 416 unsatisfiable).
+        Waits up to 30s for unresolved torrent metadata (504 on timeout). `raw=true`
+        skips the preload bookkeeping; `class` selects the read priority (playback
+        | ahead | cold | patient; legacy `bg=1` maps to ahead); `deadline` (unix milliseconds)
+        caps the reader's wait. An optional cosmetic `/{filename}` suffix is accepted
+        on both route shapes (e.g. /api/torrents/{hash}/files/{fileIndex}/stream/movie.mkv).
+        HEAD is supported on both shapes. Adaptive playback is handled by the HLS
+        endpoint instead.
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: File index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: raw=true — serve progressive bytes without preload bookkeeping
+        in: query
+        name: raw
+        type: boolean
+      - description: 'Read class: playback | ahead | cold | patient'
+        enum:
+        - playback
+        - ahead
+        - cold
+        - patient
+        in: query
+        name: class
+        type: string
+      - description: 'Legacy: bg=1 → ahead read class'
+        in: query
+        name: bg
+        type: string
+      - description: Caller deadline as unix milliseconds — caps the reader's wait
+        in: query
+        name: deadline
+        type: integer
+      - description: HTTP Range header (e.g. bytes=0-)
+        in: header
+        name: Range
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Full body
+          schema:
+            type: string
+        "206":
+          description: Partial content (Content-Range)
+          schema:
+            type: string
+        "400":
+          description: invalid hash or file index
+          schema:
+            type: string
+        "404":
+          description: torrent not active
+          schema:
+            type: string
+        "416":
+          description: range not satisfiable
+          schema:
+            type: string
+        "500":
+          description: storage cache not found
+          schema:
+            type: string
+        "504":
+          description: timeout waiting for torrent metadata (30s)
+          schema:
+            type: string
+      security: []
+      summary: Progressive download of a torrent file
+      tags:
+      - Streaming
+  /stream/{hash}/{fileIndex}/subtitles/{trackIndex}:
+    get:
+      description: 'Demuxes an embedded text subtitle track (0-based trackIndex =
+        subtitle relIndex from /metadata) and serves it as WebVTT (default), ASS/SSA
+        or SRT depending on `format`. With `start` the extraction is windowed around
+        the playhead; a window whose pieces are not downloaded yet returns 202 + `Retry-After:
+        2` and the client retries as playback nears. Responses carry a content ETag
+        — conditional re-requests get 304. Also mounted at the legacy path /stream/{hash}/{fileIndex}/subtitles/{trackIndex}.'
+      parameters:
+      - description: Infohash (40-char hex)
+        in: path
+        name: hash
+        required: true
+        type: string
+      - description: File index in the torrent (1-based)
+        in: path
+        name: fileIndex
+        required: true
+        type: integer
+      - description: Subtitle track index (0-based, per-file subtitle relIndex)
+        in: path
+        name: trackIndex
+        required: true
+        type: integer
+      - description: 'Output format: webvtt (default) | ass | srt'
+        in: query
+        name: format
+        type: string
+      - description: Playhead seconds — extract only the windowed time-slice around
+          it
+        in: query
+        name: start
+        type: number
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Subtitle body (text/vtt, text/x-ssa or text/srt)
+          schema:
+            type: string
+        "202":
+          description: Window not downloaded yet — retry after Retry-After seconds
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              type: integer
+          schema:
+            type: string
+        "304":
+          description: Not modified (matching ETag)
+          schema:
+            type: string
+        "500":
+          description: subtitle extraction failed
+          schema:
+            type: string
+      security: []
+      summary: Extract an embedded subtitle track
+      tags:
+      - Media
+schemes:
+- http
+securityDefinitions:
+  BasicAuth:
+    type: basic
+swagger: "2.0"

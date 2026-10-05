@@ -25,3 +25,22 @@ jobs:
 
       - name: Vet
         run: docker run --rm potok-torrentgo:test go vet ./...
+
+  # Fails when the committed OpenAPI spec drifts from the swag annotations in the code. Pure Go — the
+  # generator only parses sources, so no FFmpeg/cgo toolchain is needed (runs outside Docker).
+  openapi-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Regenerate OpenAPI spec
+        run: go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g main.go --outputTypes yaml -o docs
+
+      - name: Verify spec is up to date
+        run: git diff --exit-code docs/

@@ -38,6 +38,20 @@ type ClientMetadata struct {
 	OutroEnd   float64       `json:"outroEnd"`
 }
 
+// HandleGetMediaMetadata godoc
+//	@ID			getMediaMetadata
+//
+//	@Summary		Probe a video file's tracks and playback metadata
+//	@Description	In-process (libav) probe of one file in the torrent: duration, audio/subtitle tracks (relIndex is the rendition index used in HLS `a/{rel}/…`, `s/{rel}/…` URIs), and intro/outro timecodes when known. The `xs` query folds EXTERNAL sidecar subtitle files (1-based torrent indices, comma-separated) into the track list as `sourceFile`-carrying tracks.
+//	@Tags			Media
+//	@Produce		json
+//	@Param			hash		path		string	true	"Infohash (40-char hex)"
+//	@Param			fileIndex	path		int		true	"File index in the torrent (1-based)"
+//	@Param			xs			query		string	false	"External subtitle files to include (1-based torrent indices, comma-separated)"
+//	@Success		200			{object}	handlers.ClientMetadata
+//	@Failure		500			{string}	string	"probe failed"
+//	@Security
+//	@Router			/api/torrents/{hash}/files/{fileIndex}/metadata [get]
 func (h *HandlerContext) HandleGetMediaMetadata(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 	fileIndexStr := chi.URLParam(r, "fileIndex")

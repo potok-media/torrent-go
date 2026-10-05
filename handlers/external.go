@@ -104,6 +104,19 @@ func cleanExternalLabel(s string) string {
 // the sidecar file directly by its torrent index and converts SRT→WebVTT (ASS/VTT pass through). It ignores
 // ?start= (sub files are tiny — the whole doc is returned; the player's windowed feeder dedupes cues), so the
 // player needs no change to consume it.
+// HandleGetExternalSubtitleFile godoc
+//	@ID			getExternalSubtitleFile
+//
+//	@Summary		Serve an external (sidecar) subtitle file
+//	@Description	Reads a WHOLE sidecar subtitle file (a separate file in the torrent, "ext" releases) by its 1-based torrent index and converts SRT to WebVTT (ASS/SSA/VTT pass through unchanged). Unlike /subtitles/{trackIndex}, no embedded-track demux is involved; `?start=` is ignored (sub files are tiny, the player's windowed feeder dedupes cues).
+//	@Tags			Media
+//	@Produce		plain
+//	@Param			hash		path		string	true	"Infohash (40-char hex)"
+//	@Param			fileIndex	path		int		true	"Torrent index of the subtitle file itself (1-based)"
+//	@Success		200			{string}	string	"Subtitle body (text/vtt, text/x-ssa or text/plain)"
+//	@Failure		500			{string}	string	"subtitle file unavailable / read failed"
+//	@Security
+//	@Router			/api/torrents/{hash}/files/{fileIndex}/subtitle-file [get]
 func (h *HandlerContext) HandleGetExternalSubtitleFile(w http.ResponseWriter, r *http.Request) {
 	hashHex := chi.URLParam(r, "hash")
 	fileIndexStr := chi.URLParam(r, "fileIndex")

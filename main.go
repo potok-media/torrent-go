@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,6 +25,12 @@ import (
 	"github.com/potok-media/potok-torrentgo/storage"
 	"github.com/potok-media/potok-torrentgo/webui"
 )
+
+// openAPISpec is the generated OpenAPI description of this service (swaggo/swag; regenerate with
+// `go run github.com/swaggo/swag/cmd/swag@v1.16.4 init -g main.go --outputTypes yaml -o docs`).
+//
+//go:embed docs/swagger.yaml
+var openAPISpec []byte
 
 func raiseRlimit() {
 	var rLimit syscall.Rlimit
@@ -70,6 +77,44 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// handleHealth godoc
+//	@ID			healthCheck
+//
+//	@Summary		Health check
+//	@Description	Liveness probe; always 200 with the plain-text body "OK".
+//	@Tags			System
+//	@Produce		plain
+//	@Success		200	{string}	string	"OK"
+//	@Security
+//	@Router			/health [get]
+func handleHealth(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("OK"))
+}
+
+// handleOpenAPI godoc
+//	@ID			getOpenAPISpec
+//
+//	@Summary		OpenAPI specification
+//	@Description	Serves the generated OpenAPI (Swagger 2.0) YAML embedded in the binary.
+//	@Tags			System
+//	@Produce		application/yaml
+//	@Success		200	{string}	string	"OpenAPI YAML"
+//	@Security
+//	@Router			/openapi.yaml [get]
+func handleOpenAPI(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write(openAPISpec)
+}
+
+//	@title			Potok TorrentGo API
+//	@version		2.0
+//	@description	Standalone BitTorrent streaming engine for Potok: torrent metadata, direct streaming, HLS, subtitles, thumbnails, and an optional management web UI.
+//	@description	The plugin/streaming routes are open (players hit them without credentials); the /api/manage/* contour is mounted only with TORRENTGO_ENABLE_WEBUI=true and protected by HTTP Basic auth. Errors are text/plain (via http.Error) unless noted otherwise.
+//	@BasePath		/
+//	@schemes		http
+//	@securityDefinitions.basic	BasicAuth
 func main() {
 	// 1. Load config
 	cfg := config.LoadConfig()
@@ -160,11 +205,10 @@ func main() {
 		})).ServeHTTP(w, r)
 	})
 
-	// Health check (unauthenticated)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
+	// Health check + API documentation (unauthenticated, always on)
+	r.Get("/health", handleHealth)
+	r.Get("/openapi.yaml", handleOpenAPI)
+	r.Get("/docs", handlers.HandleDocs)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
