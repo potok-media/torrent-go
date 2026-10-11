@@ -6,7 +6,7 @@ HLS, subtitles, thumbnails, and an optional management web UI. This project live
 It does not require the Gateway, SearchEngine, or PostgreSQL to build or run.
 
 **Docs:** [DeepWiki](https://deepwiki.com/potok-media/torrent-go) — ask questions about
-the codebase · API reference (Scalar UI) at **https://torrent.potok.rip/scalar**
+the codebase · API reference (Scalar UI) at **https://torrent.potok.rip/docs**
 (spec at **`/openapi.yaml`**) — see [API](#api).
 
 ## Deploy
@@ -87,7 +87,7 @@ Two contours:
 Errors are `text/plain` via `http.Error`; the one exception is metadata-resolution
 timeout, which returns `504` with a JSON `{error: "METADATA_TIMEOUT"}` body.
 
-Interactive docs (Scalar UI) live at **`/scalar`**, the machine-readable spec at
+Interactive docs (Scalar UI) live at **`/docs`**, the machine-readable spec at
 **`/openapi.yaml`** — both unauthenticated and always on.
 
 The spec is generated from code annotations with
